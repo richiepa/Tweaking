@@ -18,28 +18,26 @@
 <main class="wrap">
   <header class="masthead">
     <h1>Tweaking</h1>
-    <p class="tagline">how bad is it right now?</p>
   </header>
 
   <section class="card log-card" aria-label="Log an entry">
     <div class="level-readout">
       <output id="level-value" for="level">5</output>
-      <span id="level-word" class="level-word">actively tweaking</span>
     </div>
     <input type="range" id="level" min="1" max="10" step="1" value="5" aria-label="Tweak level from 1 to 10">
-    <div class="scale-ends" aria-hidden="true"><span>1 &middot; chillin</span><span>10 &middot; catastrophic</span></div>
-    <input type="text" id="note" maxlength="200" placeholder="what triggered it? (optional)" autocomplete="off" aria-label="Optional note">
-    <button id="log-btn" class="primary" type="button">Log it</button>
+    <div class="scale-ends" aria-hidden="true"><span>1</span><span>10</span></div>
+    <input type="text" id="note" maxlength="200" placeholder="note (optional)" autocomplete="off" aria-label="Optional note">
+    <button id="log-btn" class="primary" type="button">Log</button>
   </section>
 
   <section id="history" hidden>
-    <h2>Your spiral</h2>
+    <h2>Trend</h2>
     <div class="card chart-card"><div id="chart"></div></div>
     <h2>Entries</h2>
     <ul id="entries" class="entries"></ul>
   </section>
 
-  <p id="empty" class="empty">Nothing logged yet. Surely you're tweaking about something.</p>
+  <p id="empty" class="empty">No entries yet.</p>
 
   <footer>Your log never leaves this device.</footer>
 </main>

@@ -72,8 +72,6 @@ body {
   font-weight: 700;
   letter-spacing: -0.02em;
 }
-.tagline { margin: 2px 0 0; color: var(--ink-2); font-size: 14px; }
-
 h2 {
   margin: 24px 0 8px;
   font-size: 13px;
@@ -103,8 +101,6 @@ h2 {
   line-height: 1;
   letter-spacing: -0.02em;
 }
-.level-word { color: var(--ink-2); font-size: 15px; }
-
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;

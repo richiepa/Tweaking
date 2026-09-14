@@ -2,19 +2,6 @@
 (() => {
   "use strict";
 
-  const LEVEL_WORDS = [
-    "unbothered",
-    "a stray thought",
-    "mildly tweaking",
-    "checked their story",
-    "actively tweaking",
-    "rereading old texts",
-    "down bad",
-    "drafting the risky text",
-    "spiraling",
-    "catastrophic",
-  ];
-
   const SVG_NS = "http://www.w3.org/2000/svg";
   const ICON_EDIT =
     '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
@@ -81,7 +68,6 @@
   const $ = (id) => document.getElementById(id);
   const levelInput = $("level");
   const levelValue = $("level-value");
-  const levelWord = $("level-word");
   const noteInput = $("note");
   const logBtn = $("log-btn");
   const historyEl = $("history");
@@ -90,16 +76,15 @@
   const emptyEl = $("empty");
 
   // ---- Slider ----
-  function syncSlider(input, valueEl, wordEl) {
+  function syncSlider(input, valueEl) {
     const v = Number(input.value);
     const pct = ((v - input.min) / (input.max - input.min)) * 100;
     input.style.setProperty("--pct", pct + "%");
     valueEl.textContent = String(v);
-    if (wordEl) wordEl.textContent = LEVEL_WORDS[v - 1];
   }
 
-  levelInput.addEventListener("input", () => syncSlider(levelInput, levelValue, levelWord));
-  syncSlider(levelInput, levelValue, levelWord);
+  levelInput.addEventListener("input", () => syncSlider(levelInput, levelValue));
+  syncSlider(levelInput, levelValue);
 
   // ---- Logging ----
   let doneTimer = null;
@@ -121,13 +106,13 @@
     entries.unshift(entry);
     noteInput.value = "";
     levelInput.value = "5";
-    syncSlider(levelInput, levelValue, levelWord);
+    syncSlider(levelInput, levelValue);
     render();
-    logBtn.textContent = "Logged.";
+    logBtn.textContent = "Logged";
     logBtn.classList.add("done");
     clearTimeout(doneTimer);
     doneTimer = setTimeout(() => {
-      logBtn.textContent = "Log it";
+      logBtn.textContent = "Log";
       logBtn.classList.remove("done");
     }, 1200);
   }
@@ -252,7 +237,7 @@
     range.step = "1";
     range.value = String(entry.level);
     range.setAttribute("aria-label", "Tweak level from 1 to 10");
-    range.addEventListener("input", () => syncSlider(range, out, null));
+    range.addEventListener("input", () => syncSlider(range, out));
     levelRow.append(out, range);
 
     const note = document.createElement("input");
@@ -286,7 +271,7 @@
     actions.append(cancel, save);
 
     form.append(levelRow, note, actions);
-    requestAnimationFrame(() => syncSlider(range, out, null));
+    requestAnimationFrame(() => syncSlider(range, out));
     return form;
   }
 

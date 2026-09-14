@@ -1,8 +1,8 @@
 # Tweaking
 
-Log how bad you're tweaking, 1 to 10. Open it, slide to a number, optionally say
-what triggered it, done. Look back at a list of your entries and a chart of your
-spiral. See [REQUIREMENTS.md](REQUIREMENTS.md) for the full spec.
+Log how bad you're tweaking, 1 to 10. Slide to a number, add an optional note,
+done. History shows a list of entries and a chart over time. See
+[REQUIREMENTS.md](REQUIREMENTS.md) for the full spec.
 
 Everything is stored in your browser's IndexedDB — **your log never leaves your
 device**. No accounts, no server, no tracking.
