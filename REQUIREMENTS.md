@@ -4,14 +4,14 @@
 
 **Tweaking** is a dead-simple web app for logging how bad you're tweaking (e.g. over a girl) in the moment. Open it, slide to a number, optionally vent in one line or snap a selfie, done. Over time you can look back at a list of your entries and a chart of your spiral.
 
-Anyone can use it from any device via a link. The device can hold several **profiles** (accounts), each with its own private log and optional profile picture. Everything is **stored on the device itself** — no sign-up, no server that ever sees the data.
+Anyone can use it from any device via a link. First-time users **register an account** (username + password, optional profile picture); a device can hold several accounts, each with its own private log. Everything is **stored on the device itself** — no server ever sees the data, passwords included.
 
 ## Goals
 
 - Logging an entry takes **under 10 seconds** from opening the app.
 - Works on any modern device (phone, tablet, laptop) through the browser.
 - Installable to the home screen like a real app (PWA).
-- Zero friction: no sign-up, no onboarding, no settings required.
+- Low friction: one-time register (username + password), then the app opens straight to the slider.
 
 ## Non-goals
 
@@ -39,38 +39,39 @@ Anyone can use it from any device via a link. The device can hold several **prof
 7. Tapping an entry selects it: the row highlights and the chart pins that point (crosshair + tooltip), scrolling the chart into view. Tapping again deselects.
 8. Tapping an entry's photo thumbnail opens it full-size; tapping again closes it.
 
-### Profiles (accounts)
+### Accounts
 
-9. The device holds one or more named profiles. A default profile ("Me") is created on first run, and entries logged before profiles existed are adopted by it.
-10. Each profile has a **name** and an optional **profile picture** (downscaled to ≤256px, stored on-device).
-11. The header shows the active profile's picture (or initial); tapping it opens the profile panel to **switch, add, edit, or delete** profiles.
-12. Each profile sees only its own entries and chart. The active profile is remembered on the device.
-13. Deleting a profile requires a one-tap confirmation and deletes its entries; the last remaining profile cannot be deleted. There are no passwords — profiles are for separating logs, not for security.
+9. On first run the app shows a **register screen**: pick a username, a password (min 4 chars), and an optional profile picture. No email, no confirmation field, no recovery flow.
+10. Returning to the app while signed in skips login (the session is remembered per device). **Sign out** returns to a login screen listing the device's accounts; logging in or switching accounts requires that account's password.
+11. Each account has a **username** (unique per device) and optional **profile picture** (≤256px, on-device). The header shows the active account's picture or initial; tapping it opens the panel to switch, add, edit, sign out, or delete.
+12. Each account sees only its own entries and chart.
+13. Deleting an account requires typing its password and deletes its entire log. Accounts created before passwords existed are asked to set one on their next login.
+14. Honest limits, stated in the UI: accounts live only on this device, there is no password reset, and passwords gate the app's screens — the underlying data is hashed-password-gated, not encrypted, so this is privacy from casual snooping, not real security against someone with the device and technical skill.
 
 ### Data & privacy
 
-14. All data — entries, photos, profiles — is stored **locally on the device** (IndexedDB). Nothing is ever sent to a server.
-15. The app states this plainly (footer: "Your log never leaves this device").
-16. Because storage is on-device: clearing browser data wipes everything, and a log does not follow the user to a new device. Accepted trade-off, not a bug.
+15. All data — entries, photos, profiles — is stored **locally on the device** (IndexedDB). Nothing is ever sent to a server.
+16. The app states this plainly (footer: "Your log never leaves this device").
+17. Because storage is on-device: clearing browser data wipes everything, and a log does not follow the user to a new device. Accepted trade-off, not a bug.
 
 ## Non-functional requirements
 
 ### Platform & delivery
 
-17. Delivered as a **Progressive Web App**: a single URL that works in any modern mobile or desktop browser.
-18. Installable to the home screen (manifest with name, icon, theme color; standalone display mode).
-19. Works **fully offline** after first load. Page loads are network-first with cache fallback so new deploys appear on the next open.
+18. Delivered as a **Progressive Web App**: a single URL that works in any modern mobile or desktop browser.
+19. Installable to the home screen (manifest with name, icon, theme color; standalone display mode).
+20. Works **fully offline** after first load. Page loads are network-first with cache fallback so new deploys appear on the next open.
 
 ### Usability
 
-20. Dark theme only — one committed charcoal-and-orange look.
-21. Mobile-first layout; comfortably usable one-handed at ~400px wide. Also fine on desktop.
-22. Fast: interactive in well under 2 seconds on a mid-range phone.
-23. No login walls, cookie banners, popups, or interstitials between the user and the slider.
+21. Dark theme only — one committed charcoal-and-orange look.
+22. Mobile-first layout; comfortably usable one-handed at ~400px wide. Also fine on desktop.
+23. Fast: interactive in well under 2 seconds on a mid-range phone.
+24. Beyond the one-time register (and login after a sign-out), nothing stands between the user and the slider — no cookie banners, popups, or interstitials, and no login on every open.
 
 ### Tech constraints
 
-24. Static site (HTML/CSS/JS), no build step, no backend, no database server, no auth service.
+25. Static site (HTML/CSS/JS), no build step, no backend, no database server, no auth service.
 
 ## Data model
 
@@ -79,7 +80,8 @@ Anyone can use it from any device via a link. The device can hold several **prof
 | Field | Type | Notes |
 |-------|------|-------|
 | `id` | string | UUID |
-| `name` | string | ≤ 30 chars |
+| `name` | string | Username, unique per device, ≤ 30 chars |
+| `passSalt`, `passHash` | string | Salted SHA-256 of the password |
 | `avatar` | Blob or null | JPEG ≤ 256px |
 | `createdAt` | timestamp | |
 

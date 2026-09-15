@@ -7,8 +7,6 @@
     '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
   const ICON_DELETE =
     '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
-  const ICON_CAMERA =
-    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
 
   // ---- Storage (IndexedDB) ----
   const DB_NAME = "tweaking";
@@ -67,25 +65,49 @@
       : Date.now() + "-" + Math.random().toString(36).slice(2);
   }
 
-  function rememberProfile(id) {
-    try { localStorage.setItem("tweaking-profile", id); } catch (e) { /* private mode etc. */ }
+  function rememberSession(id) {
+    try {
+      if (id) localStorage.setItem("tweaking-profile", id);
+      else localStorage.removeItem("tweaking-profile");
+    } catch (e) { /* private mode etc. */ }
   }
-  function recallProfile() {
+  function recallSession() {
     try { return localStorage.getItem("tweaking-profile"); } catch (e) { return null; }
+  }
+
+  // ---- Passwords (salted hash, on-device only; gates the UI, not encryption) ----
+  async function hashPassword(password, salt) {
+    const data = new TextEncoder().encode(salt + ":" + password);
+    if (crypto.subtle) {
+      const buf = await crypto.subtle.digest("SHA-256", data);
+      return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+    // insecure-context fallback (djb2) — still better than plain text
+    let h = 5381;
+    for (const b of data) h = ((h << 5) + h + b) | 0;
+    return "djb2-" + (h >>> 0).toString(16);
+  }
+
+  async function checkPassword(profile, password) {
+    if (!profile.passHash) return true; // legacy profile from before passwords
+    return (await hashPassword(password, profile.passSalt)) === profile.passHash;
   }
 
   // ---- State ----
   let profiles = [];
-  let activeProfileId = null;
+  let activeProfileId = null; // signed-in profile, or null = auth screen
   let entries = []; // active profile's, newest first
   let editingId = null;
   let selectedId = null;
   let editingProfileId = null;
+  let authMode = "login"; // or "register"
+  let expanded = null; // {id, action: "switch" | "delete" | "setpw"} row expansion
   let pendingPhoto = null; // blob attached to the next log
-  let pendingProfilePic = null; // blob for the new-profile form
+  let pendingRegPic = null; // blob for the register form
 
   // ---- Elements ----
   const $ = (id) => document.getElementById(id);
+  const appEl = $("app");
   const levelInput = $("level");
   const levelValue = $("level-value");
   const noteInput = $("note");
@@ -99,10 +121,20 @@
   const profileInitial = $("profile-initial");
   const profilePanel = $("profile-panel");
   const profileList = $("profile-list");
-  const newProfileName = $("new-profile-name");
-  const newProfilePicBtn = $("new-profile-pic-btn");
-  const newProfilePic = $("new-profile-pic");
-  const newProfileAdd = $("new-profile-add");
+  const panelNew = $("panel-new-account");
+  const panelSignOut = $("panel-sign-out");
+  const authEl = $("auth");
+  const authHeading = $("auth-heading");
+  const authLogin = $("auth-login");
+  const authList = $("auth-list");
+  const authRegister = $("auth-register");
+  const regName = $("reg-name");
+  const regPass = $("reg-pass");
+  const regPicBtn = $("reg-pic-btn");
+  const regPic = $("reg-pic");
+  const regSubmit = $("reg-submit");
+  const authToggle = $("auth-toggle");
+  const authError = $("auth-error");
   const photoBtn = $("photo-btn");
   const photoInput = $("photo-input");
   const photoPreview = $("photo-preview");
@@ -230,25 +262,14 @@
     photoPreview.hidden = true;
   }
 
-  // ---- Profiles ----
+  // ---- Auth ----
   function activeProfile() {
-    return profiles.find((p) => p.id === activeProfileId) || profiles[0];
+    return profiles.find((p) => p.id === activeProfileId) || null;
   }
 
-  function renderHeader() {
-    const p = activeProfile();
-    if (!p) return;
-    if (p.avatar) {
-      profileAvatar.src = blobUrl(p.avatar);
-      profileAvatar.hidden = false;
-      profileInitial.hidden = true;
-    } else {
-      profileAvatar.hidden = true;
-      profileAvatar.removeAttribute("src");
-      profileInitial.hidden = false;
-      profileInitial.textContent = (p.name || "?").trim().charAt(0).toUpperCase() || "?";
-    }
-    profileBtn.setAttribute("aria-label", "Profiles — signed in as " + (p.name || "?"));
+  function showAuthError(msg) {
+    authError.textContent = msg;
+    authError.hidden = !msg;
   }
 
   async function loadEntries() {
@@ -256,15 +277,92 @@
     return all.filter((e) => e.profileId === activeProfileId).sort((a, b) => b.createdAt - a.createdAt);
   }
 
-  async function switchProfile(id) {
+  async function signIn(id) {
     activeProfileId = id;
-    rememberProfile(id);
+    rememberSession(id);
     editingId = null;
     selectedId = null;
-    entries = await loadEntries();
+    editingProfileId = null;
+    expanded = null;
     profilePanel.hidden = true;
+    showAuthError("");
+    entries = await loadEntries();
     render();
   }
+
+  function signOut() {
+    activeProfileId = null;
+    rememberSession(null);
+    entries = [];
+    expanded = null;
+    editingProfileId = null;
+    profilePanel.hidden = true;
+    authMode = profiles.length ? "login" : "register";
+    showAuthError("");
+    render();
+  }
+
+  async function registerAccount() {
+    const name = regName.value.trim().slice(0, 30);
+    const pass = regPass.value;
+    if (!name) {
+      showAuthError("Pick a username.");
+      regName.focus();
+      return;
+    }
+    if (profiles.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
+      showAuthError("That username is taken on this device.");
+      return;
+    }
+    if (pass.length < 4) {
+      showAuthError("Password needs at least 4 characters.");
+      regPass.focus();
+      return;
+    }
+    const passSalt = newId();
+    const passHash = await hashPassword(pass, passSalt);
+    const p = { id: newId(), name, avatar: pendingRegPic, passSalt, passHash, createdAt: Date.now() };
+    await dbPut(PROFILES, p);
+    const firstAccount = profiles.length === 0;
+    profiles.push(p);
+    regName.value = "";
+    regPass.value = "";
+    pendingRegPic = null;
+    regPicBtn.classList.remove("has-pic");
+    if (firstAccount) {
+      // adopt any entries from before accounts existed
+      const all = await dbGetAll(ENTRIES);
+      for (const en of all) {
+        if (!en.profileId) {
+          en.profileId = p.id;
+          await dbPut(ENTRIES, en);
+        }
+      }
+    }
+    await signIn(p.id);
+  }
+
+  regSubmit.addEventListener("click", registerAccount);
+  regPass.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") registerAccount();
+  });
+  regPicBtn.addEventListener("click", () => regPic.click());
+  regPic.addEventListener("change", async () => {
+    const file = regPic.files && regPic.files[0];
+    regPic.value = "";
+    if (!file) return;
+    const blob = await resizeImage(file, 256, 0.85);
+    if (!blob) return;
+    pendingRegPic = blob;
+    regPicBtn.classList.add("has-pic");
+  });
+
+  authToggle.addEventListener("click", () => {
+    authMode = authMode === "login" ? "register" : "login";
+    expanded = null;
+    showAuthError("");
+    renderAuth();
+  });
 
   function avatarNode(p, size) {
     if (p.avatar) {
@@ -280,11 +378,140 @@
     return span;
   }
 
+  // Expanded password prompt under a profile row. verb: button label;
+  // danger: style the button red; onSubmit(password) does the work.
+  function passwordPrompt(p, verb, danger, onSubmit) {
+    const wrap = document.createElement("div");
+    wrap.className = "row-action";
+    const pass = document.createElement("input");
+    pass.type = "password";
+    pass.maxLength = 64;
+    pass.placeholder = p.passHash ? "password" : "set a password";
+    pass.setAttribute("aria-label", "Password for " + p.name);
+    const go = document.createElement("button");
+    go.className = "primary small" + (danger ? " danger-fill" : "");
+    go.type = "button";
+    go.textContent = p.passHash ? verb : "Set password & " + verb.toLowerCase();
+    const submit = () => onSubmit(pass.value);
+    go.addEventListener("click", submit);
+    pass.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submit();
+    });
+    wrap.append(pass, go);
+    requestAnimationFrame(() => pass.focus());
+    return wrap;
+  }
+
+  // A legacy profile (no password yet) sets one on its next sign-in.
+  async function ensurePassword(p, password) {
+    if (p.passHash) return;
+    if (password.length < 4) throw new Error("Password needs at least 4 characters.");
+    p.passSalt = newId();
+    p.passHash = await hashPassword(password, p.passSalt);
+    await dbPut(PROFILES, p);
+  }
+
+  async function trySignIn(p, password, errorTo) {
+    try {
+      if (!p.passHash) {
+        await ensurePassword(p, password);
+      } else if (!(await checkPassword(p, password))) {
+        errorTo("Wrong password.");
+        return;
+      }
+      await signIn(p.id);
+    } catch (err) {
+      errorTo(err.message || "Something went wrong.");
+    }
+  }
+
+  function renderAuth() {
+    revokeUrls();
+    const registering = authMode === "register" || profiles.length === 0;
+    authHeading.textContent = registering ? "Create your account" : "Who's tweaking?";
+    authLogin.hidden = registering;
+    authRegister.hidden = !registering;
+    authToggle.hidden = profiles.length === 0;
+    authToggle.textContent = registering ? "Back to log in" : "New account";
+
+    if (!registering) {
+      authList.textContent = "";
+      for (const p of profiles) {
+        const li = document.createElement("li");
+        li.className = "profile-row";
+        const main = document.createElement("div");
+        main.className = "profile-main";
+        main.addEventListener("click", () => {
+          expanded = expanded && expanded.id === p.id ? null : { id: p.id, action: "switch" };
+          showAuthError("");
+          renderAuth();
+        });
+        main.appendChild(avatarNode(p, "avatar-sm"));
+        const name = document.createElement("span");
+        name.className = "profile-name";
+        name.textContent = p.name;
+        main.appendChild(name);
+        li.appendChild(main);
+        if (expanded && expanded.id === p.id) {
+          li.appendChild(passwordPrompt(p, "Log in", false, (pw) => trySignIn(p, pw, showAuthError)));
+        }
+        authList.appendChild(li);
+      }
+    }
+  }
+
+  // ---- Profile panel (signed in) ----
+  profileBtn.addEventListener("click", () => {
+    profilePanel.hidden = !profilePanel.hidden;
+    if (!profilePanel.hidden) {
+      editingProfileId = null;
+      expanded = null;
+      renderProfiles();
+    }
+  });
+
+  panelNew.addEventListener("click", () => {
+    signOut();
+    authMode = "register";
+    renderAuth();
+  });
+
+  panelSignOut.addEventListener("click", signOut);
+
+  function renderHeader() {
+    const p = activeProfile();
+    if (!p) return;
+    if (p.avatar) {
+      profileAvatar.src = blobUrl(p.avatar);
+      profileAvatar.hidden = false;
+      profileInitial.hidden = true;
+    } else {
+      profileAvatar.hidden = true;
+      profileAvatar.removeAttribute("src");
+      profileInitial.hidden = false;
+      profileInitial.textContent = (p.name || "?").trim().charAt(0).toUpperCase() || "?";
+    }
+    profileBtn.setAttribute("aria-label", "Accounts — signed in as " + (p.name || "?"));
+  }
+
   function renderProfiles() {
     profileList.textContent = "";
     for (const p of profiles) {
       profileList.appendChild(profileRow(p));
     }
+  }
+
+  function panelError(li) {
+    return (msg) => {
+      let err = li.querySelector(".auth-error");
+      if (!err) {
+        err = document.createElement("p");
+        err.className = "auth-error";
+        li.appendChild(err);
+      }
+      err.textContent = msg;
+      err.hidden = !msg;
+    };
   }
 
   function profileRow(p) {
@@ -300,7 +527,9 @@
     main.className = "profile-main";
     main.addEventListener("click", (e) => {
       if (e.target.closest("button")) return;
-      switchProfile(p.id);
+      if (p.id === activeProfileId) return;
+      expanded = expanded && expanded.id === p.id && expanded.action === "switch" ? null : { id: p.id, action: "switch" };
+      renderProfiles();
     });
 
     main.appendChild(avatarNode(p, "avatar-sm"));
@@ -313,64 +542,73 @@
     if (p.id === activeProfileId) {
       const dot = document.createElement("span");
       dot.className = "active-dot";
-      dot.setAttribute("aria-label", "Current profile");
+      dot.setAttribute("aria-label", "Signed in");
       main.appendChild(dot);
+
+      const editBtn = document.createElement("button");
+      editBtn.className = "icon-btn";
+      editBtn.type = "button";
+      editBtn.setAttribute("aria-label", "Edit profile " + p.name);
+      editBtn.innerHTML = ICON_EDIT;
+      editBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        editingProfileId = p.id;
+        expanded = null;
+        renderProfiles();
+      });
+      main.appendChild(editBtn);
     }
 
-    const editBtn = document.createElement("button");
-    editBtn.className = "icon-btn";
-    editBtn.type = "button";
-    editBtn.setAttribute("aria-label", "Edit profile " + p.name);
-    editBtn.innerHTML = ICON_EDIT;
-    editBtn.addEventListener("click", (e) => {
+    const delBtn = document.createElement("button");
+    delBtn.className = "icon-btn";
+    delBtn.type = "button";
+    delBtn.setAttribute("aria-label", "Delete account " + p.name);
+    delBtn.innerHTML = ICON_DELETE;
+    delBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      editingProfileId = editingProfileId === p.id ? null : p.id;
+      expanded = expanded && expanded.id === p.id && expanded.action === "delete" ? null : { id: p.id, action: "delete" };
       renderProfiles();
     });
-    main.appendChild(editBtn);
-
-    if (profiles.length > 1) {
-      const delBtn = document.createElement("button");
-      delBtn.className = "icon-btn";
-      delBtn.type = "button";
-      delBtn.setAttribute("aria-label", "Delete profile " + p.name);
-      delBtn.innerHTML = ICON_DELETE;
-      let confirmTimer = null;
-      delBtn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        if (!delBtn.classList.contains("confirm")) {
-          delBtn.classList.add("confirm");
-          delBtn.textContent = "Sure?";
-          confirmTimer = setTimeout(() => {
-            delBtn.classList.remove("confirm");
-            delBtn.innerHTML = ICON_DELETE;
-          }, 3000);
-          return;
-        }
-        clearTimeout(confirmTimer);
-        const all = await dbGetAll(ENTRIES);
-        for (const en of all) if (en.profileId === p.id) await dbDelete(ENTRIES, en.id);
-        await dbDelete(PROFILES, p.id);
-        profiles = profiles.filter((x) => x.id !== p.id);
-        if (editingProfileId === p.id) editingProfileId = null;
-        if (activeProfileId === p.id) {
-          await switchProfile(profiles[0].id);
-          profilePanel.hidden = false;
-        }
-        renderProfiles();
-        renderHeader();
-      });
-      main.appendChild(delBtn);
-    }
+    main.appendChild(delBtn);
 
     li.appendChild(main);
+
+    if (expanded && expanded.id === p.id) {
+      const errorTo = panelError(li);
+      if (expanded.action === "switch") {
+        li.appendChild(passwordPrompt(p, "Switch", false, (pw) => trySignIn(p, pw, errorTo)));
+      } else if (expanded.action === "delete") {
+        const label = document.createElement("p");
+        label.className = "row-warning";
+        label.textContent = "Deletes this account and its whole log. Password to confirm:";
+        li.appendChild(label);
+        li.appendChild(
+          passwordPrompt(p, "Delete", true, async (pw) => {
+            if (p.passHash && !(await checkPassword(p, pw))) {
+              errorTo("Wrong password.");
+              return;
+            }
+            const all = await dbGetAll(ENTRIES);
+            for (const en of all) if (en.profileId === p.id) await dbDelete(ENTRIES, en.id);
+            await dbDelete(PROFILES, p.id);
+            profiles = profiles.filter((x) => x.id !== p.id);
+            expanded = null;
+            if (activeProfileId === p.id) {
+              signOut();
+            } else {
+              renderProfiles();
+            }
+          })
+        );
+      }
+    }
     return li;
   }
 
   function profileEditForm(p) {
     const form = document.createElement("div");
     form.className = "profile-edit";
-    let newPic; // undefined = keep, null = removed, blob = replace
+    let newPic; // undefined = keep, blob = replace
 
     const picBtn = document.createElement("button");
     picBtn.className = "avatar-btn avatar-pick";
@@ -401,7 +639,7 @@
     name.type = "text";
     name.maxLength = 30;
     name.value = p.name;
-    name.setAttribute("aria-label", "Profile name");
+    name.setAttribute("aria-label", "Username");
 
     const actions = document.createElement("div");
     actions.className = "edit-actions";
@@ -419,7 +657,7 @@
     save.textContent = "Save";
     save.addEventListener("click", async () => {
       const n = name.value.trim().slice(0, 30);
-      if (n) p.name = n;
+      if (n && !profiles.some((x) => x.id !== p.id && x.name.toLowerCase() === n.toLowerCase())) p.name = n;
       if (newPic !== undefined) p.avatar = newPic;
       await dbPut(PROFILES, p);
       editingProfileId = null;
@@ -435,44 +673,11 @@
     return form;
   }
 
-  profileBtn.addEventListener("click", () => {
-    profilePanel.hidden = !profilePanel.hidden;
-    if (!profilePanel.hidden) {
-      editingProfileId = null;
-      renderProfiles();
-    }
-  });
-
-  newProfilePicBtn.addEventListener("click", () => newProfilePic.click());
-  newProfilePic.addEventListener("change", async () => {
-    const file = newProfilePic.files && newProfilePic.files[0];
-    newProfilePic.value = "";
-    if (!file) return;
-    const blob = await resizeImage(file, 256, 0.85);
-    if (!blob) return;
-    pendingProfilePic = blob;
-    newProfilePicBtn.classList.add("has-pic");
-  });
-
-  newProfileAdd.addEventListener("click", async () => {
-    const name = newProfileName.value.trim().slice(0, 30);
-    if (!name) {
-      newProfileName.focus();
-      return;
-    }
-    const p = { id: newId(), name, avatar: pendingProfilePic, createdAt: Date.now() };
-    await dbPut(PROFILES, p);
-    profiles.push(p);
-    newProfileName.value = "";
-    pendingProfilePic = null;
-    newProfilePicBtn.classList.remove("has-pic");
-    await switchProfile(p.id);
-  });
-
   // ---- Logging ----
   let doneTimer = null;
 
   async function logEntry() {
+    if (!activeProfileId) return;
     const entry = {
       id: newId(),
       profileId: activeProfileId,
@@ -860,6 +1065,14 @@
 
   // ---- Render ----
   function render() {
+    const authed = !!activeProfile();
+    authEl.hidden = authed;
+    appEl.hidden = !authed;
+    profileBtn.hidden = !authed;
+    if (!authed) {
+      renderAuth();
+      return;
+    }
     const has = entries.length > 0;
     historyEl.hidden = !has;
     emptyEl.hidden = has;
@@ -874,32 +1087,37 @@
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(renderChart, 150);
   });
-  setInterval(renderList, 60e3); // keep relative times fresh
+  setInterval(() => {
+    if (activeProfile()) renderList(); // keep relative times fresh
+  }, 60e3);
 
   // ---- Boot ----
   (async () => {
     try {
       profiles = await dbGetAll(PROFILES);
-      if (!profiles.length) {
-        const p = { id: newId(), name: "Me", avatar: null, createdAt: Date.now() };
-        await dbPut(PROFILES, p);
-        profiles = [p];
-      }
-      const remembered = recallProfile();
-      activeProfileId = profiles.some((p) => p.id === remembered) ? remembered : profiles[0].id;
-      // adopt any entries from before profiles existed
-      const all = await dbGetAll(ENTRIES);
-      for (const en of all) {
-        if (!en.profileId) {
-          en.profileId = profiles[0].id;
-          await dbPut(ENTRIES, en);
+      // adopt any entries from before accounts existed
+      if (profiles.length) {
+        const all = await dbGetAll(ENTRIES);
+        for (const en of all) {
+          if (!en.profileId) {
+            en.profileId = profiles[0].id;
+            await dbPut(ENTRIES, en);
+          }
         }
       }
-      entries = all
-        .filter((e) => e.profileId === activeProfileId)
-        .sort((a, b) => b.createdAt - a.createdAt);
+      const remembered = recallSession();
+      if (remembered && profiles.some((p) => p.id === remembered)) {
+        activeProfileId = remembered;
+        entries = await loadEntries();
+      } else {
+        activeProfileId = null;
+        authMode = profiles.length ? "login" : "register";
+      }
     } catch (err) {
+      profiles = [];
       entries = [];
+      activeProfileId = null;
+      authMode = "register";
     }
     render();
   })();

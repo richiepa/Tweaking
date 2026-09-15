@@ -110,6 +110,53 @@ body {
 .profile-edit input[type="text"] { flex: 1; min-width: 0; }
 .avatar-pick { flex: none; background: transparent; }
 
+/* ---- Auth ---- */
+.auth-card { margin-bottom: 16px; }
+.auth-heading {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 650;
+}
+.auth-card input[type="password"], .row-action input[type="password"] {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--page);
+  color: var(--ink);
+  font: inherit;
+}
+.auth-card input[type="password"] { margin-top: 8px; }
+.auth-card input[type="password"]:focus-visible, .row-action input[type="password"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.auth-error {
+  margin: 10px 2px 0;
+  font-size: 13px;
+  color: var(--danger);
+}
+.auth-toggle { margin-top: 12px; }
+.auth-note {
+  margin: 14px 2px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.row-action {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 8px 8px;
+}
+.row-action input[type="password"] { flex: 1; min-width: 0; }
+.row-warning {
+  margin: 2px 8px 4px;
+  font-size: 12px;
+  color: var(--danger);
+}
+.danger-fill { background: var(--danger); }
+.panel-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
 .pic-btn {
   flex: none;
   width: 44px;

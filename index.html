@@ -17,52 +17,71 @@
 <main class="wrap">
   <header class="masthead">
     <h1>Tweaking</h1>
-    <button id="profile-btn" class="avatar-btn" type="button" aria-label="Profiles">
+    <button id="profile-btn" class="avatar-btn" type="button" hidden aria-label="Accounts">
       <img id="profile-avatar" alt="" hidden>
       <span id="profile-initial">?</span>
     </button>
   </header>
 
-  <section id="profile-panel" class="card profile-panel" hidden aria-label="Profiles">
-    <ul id="profile-list" class="profile-list"></ul>
-    <div class="profile-add">
-      <input type="text" id="new-profile-name" maxlength="30" placeholder="new profile name" autocomplete="off" aria-label="New profile name">
-      <button id="new-profile-pic-btn" class="icon-btn pic-btn" type="button" aria-label="Choose a profile picture">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-      </button>
-      <button id="new-profile-add" class="primary small" type="button">Add</button>
+  <section id="auth" class="card auth-card" hidden aria-label="Sign in">
+    <p id="auth-heading" class="auth-heading">Create your account</p>
+    <div id="auth-login" hidden>
+      <ul id="auth-list" class="profile-list"></ul>
     </div>
-    <input type="file" id="new-profile-pic" accept="image/*" hidden>
+    <div id="auth-register" hidden>
+      <div class="profile-add">
+        <input type="text" id="reg-name" maxlength="30" placeholder="username" autocomplete="username" aria-label="Username">
+        <button id="reg-pic-btn" class="icon-btn pic-btn" type="button" aria-label="Choose a profile picture">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </button>
+      </div>
+      <input type="password" id="reg-pass" maxlength="64" placeholder="password" autocomplete="new-password" aria-label="Password">
+      <button id="reg-submit" class="primary" type="button">Create account</button>
+      <input type="file" id="reg-pic" accept="image/*" hidden>
+    </div>
+    <p id="auth-error" class="auth-error" hidden></p>
+    <button id="auth-toggle" class="ghost small auth-toggle" type="button" hidden>New account</button>
+    <p class="auth-note">Accounts live only on this device. There's no reset if a password is forgotten.</p>
   </section>
 
-  <section class="card log-card" aria-label="Log an entry">
-    <div class="level-readout">
-      <output id="level-value" for="level">5.0</output>
-    </div>
-    <input type="range" id="level" min="1" max="10" step="0.1" value="5" aria-label="Tweak level from 1 to 10">
-    <div class="scale-ends" aria-hidden="true"><span>1</span><span>10</span></div>
-    <div class="note-row">
-      <input type="text" id="note" maxlength="200" placeholder="note (optional)" autocomplete="off" aria-label="Optional note">
-      <button id="photo-btn" class="icon-btn pic-btn" type="button" aria-label="Take a selfie for this entry">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-      </button>
-    </div>
-    <input type="file" id="photo-input" accept="image/*" capture="user" hidden>
-    <div id="photo-preview" class="photo-preview" hidden>
-      <img id="photo-thumb" alt="Photo preview">
-      <button id="photo-remove" class="ghost small" type="button">Remove</button>
-    </div>
-    <button id="log-btn" class="primary" type="button">Log</button>
-  </section>
+  <div id="app" hidden>
+    <section id="profile-panel" class="card profile-panel" hidden aria-label="Accounts">
+      <ul id="profile-list" class="profile-list"></ul>
+      <div class="panel-actions">
+        <button id="panel-new-account" class="ghost small" type="button">New account</button>
+        <button id="panel-sign-out" class="ghost small" type="button">Sign out</button>
+      </div>
+    </section>
 
-  <section id="history" hidden>
-    <h2>Trend</h2>
-    <div class="card chart-card"><div id="chart"></div></div>
-    <h2>Entries</h2>
-    <ul id="entries" class="entries"></ul>
-  </section>
+    <section class="card log-card" aria-label="Log an entry">
+      <div class="level-readout">
+        <output id="level-value" for="level">5.0</output>
+      </div>
+      <input type="range" id="level" min="1" max="10" step="0.1" value="5" aria-label="Tweak level from 1 to 10">
+      <div class="scale-ends" aria-hidden="true"><span>1</span><span>10</span></div>
+      <div class="note-row">
+        <input type="text" id="note" maxlength="200" placeholder="note (optional)" autocomplete="off" aria-label="Optional note">
+        <button id="photo-btn" class="icon-btn pic-btn" type="button" aria-label="Take a selfie for this entry">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </button>
+      </div>
+      <input type="file" id="photo-input" accept="image/*" capture="user" hidden>
+      <div id="photo-preview" class="photo-preview" hidden>
+        <img id="photo-thumb" alt="Photo preview">
+        <button id="photo-remove" class="ghost small" type="button">Remove</button>
+      </div>
+      <button id="log-btn" class="primary" type="button">Log</button>
+    </section>
 
-  <p id="empty" class="empty">No entries yet.</p>
+    <section id="history" hidden>
+      <h2>Trend</h2>
+      <div class="card chart-card"><div id="chart"></div></div>
+      <h2>Entries</h2>
+      <ul id="entries" class="entries"></ul>
+    </section>
+
+    <p id="empty" class="empty">No entries yet.</p>
+  </div>
 
   <footer>Your log never leaves this device.</footer>
 </main>
