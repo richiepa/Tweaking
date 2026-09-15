@@ -69,12 +69,12 @@
   const round1 = (v) => Math.round(v * 10) / 10;
   const fmt = (v) => round1(v).toFixed(1);
 
-  // green -> amber -> orange -> red as the level climbs
+  // quiet tan -> orange -> red as the level climbs
   const SEV_STOPS = [
-    [1, [20, 151, 92]],
-    [4.5, [217, 144, 0]],
-    [7, [224, 96, 42]],
-    [10, [208, 47, 61]],
+    [1, [168, 154, 132]],
+    [4.5, [229, 121, 62]],
+    [7, [224, 90, 43]],
+    [10, [224, 59, 48]],
   ];
 
   function sevRgb(v) {
