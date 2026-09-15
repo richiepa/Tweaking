@@ -142,6 +142,10 @@
   const photoRemove = $("photo-remove");
   const lightbox = $("lightbox");
   const lightboxImg = $("lightbox-img");
+  const installGuide = $("install-guide");
+  const installLink = $("install-link");
+  const installAction = $("install-action");
+  const installBtn = $("install-btn");
 
   // ---- Object URL bookkeeping ----
   const liveUrls = [];
@@ -428,7 +432,12 @@
   function renderAuth() {
     revokeUrls();
     const registering = authMode === "register" || profiles.length === 0;
-    authHeading.textContent = registering ? "Create your account" : "Who's tweaking?";
+    let heading = registering ? "Create your account" : "Who's tweaking?";
+    if (!registering && expanded) {
+      const ep = profiles.find((p) => p.id === expanded.id);
+      if (ep && !ep.passHash) heading = "Set a password to continue";
+    }
+    authHeading.textContent = heading;
     authLogin.hidden = registering;
     authRegister.hidden = !registering;
     authToggle.hidden = profiles.length === 0;
@@ -1106,12 +1115,16 @@
         }
       }
       const remembered = recallSession();
-      if (remembered && profiles.some((p) => p.id === remembered)) {
+      const rememberedProfile = profiles.find((p) => p.id === remembered);
+      if (rememberedProfile && rememberedProfile.passHash) {
         activeProfileId = remembered;
         entries = await loadEntries();
       } else {
         activeProfileId = null;
         authMode = profiles.length ? "login" : "register";
+        // an account from before passwords existed must set one right now,
+        // not on some later sign-out — drop it on its set-password prompt
+        if (rememberedProfile) expanded = { id: rememberedProfile.id, action: "switch" };
       }
     } catch (err) {
       profiles = [];
@@ -1121,6 +1134,30 @@
     }
     render();
   })();
+
+  // ---- Add to home screen ----
+  let deferredInstall = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstall = e;
+    installAction.hidden = false;
+  });
+  installBtn.addEventListener("click", async () => {
+    if (!deferredInstall) return;
+    deferredInstall.prompt();
+    await deferredInstall.userChoice.catch(() => {});
+    deferredInstall = null;
+    installAction.hidden = true;
+    installGuide.hidden = true;
+  });
+  installLink.addEventListener("click", () => {
+    installGuide.hidden = !installGuide.hidden;
+    if (!installGuide.hidden) installGuide.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+  // already on the home screen — nothing to add
+  if ((window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone) {
+    installLink.hidden = true;
+  }
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {

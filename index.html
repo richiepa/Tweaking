@@ -83,7 +83,42 @@
     <p id="empty" class="empty">No entries yet.</p>
   </div>
 
-  <footer>Your log never leaves this device.</footer>
+  <section id="install-guide" class="card install-guide" hidden aria-label="Add to home screen">
+    <p class="auth-heading">Add Tweaking to your home screen</p>
+    <div id="install-action" hidden>
+      <button id="install-btn" class="primary" type="button">Install app</button>
+      <p class="auth-note">Or follow the steps for your device:</p>
+    </div>
+    <div class="guide-group">
+      <p class="guide-os">iPhone &amp; iPad &mdash; Safari</p>
+      <ol>
+        <li>Open this site in <strong>Safari</strong>.</li>
+        <li>Tap the <strong>Share</strong> button (the square with an arrow pointing up).</li>
+        <li>Scroll down and tap <strong>Add to Home Screen</strong>.</li>
+        <li>Tap <strong>Add</strong> in the top-right corner.</li>
+      </ol>
+    </div>
+    <div class="guide-group">
+      <p class="guide-os">Android &mdash; Chrome</p>
+      <ol>
+        <li>Open this site in <strong>Chrome</strong>.</li>
+        <li>Tap the <strong>three-dot menu</strong> in the top-right corner.</li>
+        <li>Tap <strong>Add to Home screen</strong>, then <strong>Install</strong>.</li>
+      </ol>
+    </div>
+    <div class="guide-group">
+      <p class="guide-os">Computer &mdash; Chrome or Edge</p>
+      <ol>
+        <li>Click the <strong>install icon</strong> at the right end of the address bar.</li>
+        <li>Click <strong>Install</strong>.</li>
+      </ol>
+    </div>
+  </section>
+
+  <footer>
+    <span>Your log never leaves this device.</span>
+    <button id="install-link" class="link-btn" type="button">Add to home screen</button>
+  </footer>
 </main>
 <div id="lightbox" class="lightbox" hidden><img id="lightbox-img" alt="Entry photo"></div>
 <script src="app.js"></script>

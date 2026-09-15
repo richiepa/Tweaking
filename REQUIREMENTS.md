@@ -45,7 +45,7 @@ Anyone can use it from any device via a link. First-time users **register an acc
 10. Returning to the app while signed in skips login (the session is remembered per device). **Sign out** returns to a login screen listing the device's accounts; logging in or switching accounts requires that account's password.
 11. Each account has a **username** (unique per device) and optional **profile picture** (≤256px, on-device). The header shows the active account's picture or initial; tapping it opens the panel to switch, add, edit, sign out, or delete.
 12. Each account sees only its own entries and chart.
-13. Deleting an account requires typing its password and deletes its entire log. Accounts created before passwords existed are asked to set one on their next login.
+13. Deleting an account requires typing its password and deletes its entire log. An account created before passwords existed is asked to set one **immediately on its next open** — the app drops it on a "Set a password to continue" screen rather than waiting for a sign-out.
 14. Honest limits, stated in the UI: accounts live only on this device, there is no password reset, and passwords gate the app's screens — the underlying data is hashed-password-gated, not encrypted, so this is privacy from casual snooping, not real security against someone with the device and technical skill.
 
 ### Data & privacy
@@ -59,7 +59,7 @@ Anyone can use it from any device via a link. First-time users **register an acc
 ### Platform & delivery
 
 18. Delivered as a **Progressive Web App**: a single URL that works in any modern mobile or desktop browser.
-19. Installable to the home screen (manifest with name, icon, theme color; standalone display mode).
+19. Installable to the home screen (manifest with name, icon, theme color; standalone display mode). An in-app **"Add to home screen" guide** in the footer shows the standard per-platform steps (iPhone/iPad Safari share sheet, Android Chrome menu, desktop address-bar icon) and offers a one-tap install button where the browser supports it; the link hides when the app is already installed.
 20. Works **fully offline** after first load. Page loads are network-first with cache fallback so new deploys appear on the next open.
 
 ### Usability
