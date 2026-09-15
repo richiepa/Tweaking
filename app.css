@@ -1,44 +1,5 @@
+/* Dark only — one committed look, no theme switching. */
 :root {
-  color-scheme: light;
-  --page: #ece8e1;
-  --surface: #faf8f4;
-  --surface-2: #e6e0d7;
-  --ink: #26221d;
-  --ink-2: #5c564d;
-  --muted: #948c7e;
-  --grid: #e6e1d8;
-  --axis: #d0c9bd;
-  --border: rgba(38, 34, 29, 0.08);
-  --accent: #e5793e;
-  --accent-ink: #ffffff;
-  --danger: #cf4230;
-  --wash: rgba(229, 121, 62, 0.08);
-  --select-tint: rgba(229, 121, 62, 0.08);
-  --track: var(--surface-2);
-  --thumb-ring: var(--surface);
-  --shadow: 0 1px 3px rgba(38, 34, 29, 0.06);
-}
-@media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) {
-    color-scheme: dark;
-    --page: #171512;
-    --surface: #211e1a;
-    --surface-2: #2f2b25;
-    --ink: #f0ebe3;
-    --ink-2: #beb6a9;
-    --muted: #8f877a;
-    --grid: #2c2822;
-    --axis: #3a352e;
-    --border: rgba(240, 235, 227, 0.08);
-    --accent: #e8834c;
-    --accent-ink: #ffffff;
-    --danger: #e06552;
-    --wash: rgba(232, 131, 76, 0.1);
-    --select-tint: rgba(232, 131, 76, 0.1);
-    --shadow: none;
-  }
-}
-:root[data-theme="dark"] {
   color-scheme: dark;
   --page: #171512;
   --surface: #211e1a;
@@ -54,6 +15,8 @@
   --danger: #e06552;
   --wash: rgba(232, 131, 76, 0.1);
   --select-tint: rgba(232, 131, 76, 0.1);
+  --track: var(--surface-2);
+  --thumb-ring: var(--surface);
   --shadow: none;
 }
 

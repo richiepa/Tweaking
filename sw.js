@@ -1,4 +1,4 @@
-const CACHE = "tweaking-v3";
+const CACHE = "tweaking-v4";
 const ASSETS = [
   "./",
   "./index.html",
@@ -27,6 +27,23 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
+  // Navigations go network-first so a new deploy shows up on the next open;
+  // the cache is the offline fallback. Assets stay cache-first (each deploy
+  // bumps CACHE, which refreshes them).
+  if (e.request.mode === "navigate") {
+    e.respondWith(
+      fetch(e.request)
+        .then((resp) => {
+          if (resp.ok) {
+            const copy = resp.clone();
+            caches.open(CACHE).then((c) => c.put("./", copy));
+          }
+          return resp;
+        })
+        .catch(() => caches.match("./"))
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(
       (hit) =>
@@ -39,7 +56,7 @@ self.addEventListener("fetch", (e) => {
             }
             return resp;
           })
-          .catch(() => (e.request.mode === "navigate" ? caches.match("./") : undefined))
+          .catch(() => undefined)
     )
   );
 });
