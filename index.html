@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tweaking</title>
 <meta name="description" content="Log how bad you're tweaking, 1 to 10. Your log never leaves this device.">
-<meta name="theme-color" content="#f9f9f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f8f7fa" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e0d13" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -24,7 +24,7 @@
     <div class="level-readout">
       <output id="level-value" for="level">5</output>
     </div>
-    <input type="range" id="level" min="1" max="10" step="1" value="5" aria-label="Tweak level from 1 to 10">
+    <input type="range" id="level" min="1" max="10" step="0.1" value="5" aria-label="Tweak level from 1 to 10">
     <div class="scale-ends" aria-hidden="true"><span>1</span><span>10</span></div>
     <input type="text" id="note" maxlength="200" placeholder="note (optional)" autocomplete="off" aria-label="Optional note">
     <button id="log-btn" class="primary" type="button">Log</button>

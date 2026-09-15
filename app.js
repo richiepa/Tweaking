@@ -63,6 +63,35 @@
   // ---- State ----
   let entries = []; // newest first
   let editingId = null;
+  let selectedId = null;
+
+  // ---- Level formatting & severity ----
+  const round1 = (v) => Math.round(v * 10) / 10;
+  const fmt = (v) => round1(v).toFixed(1);
+
+  // green -> amber -> orange -> red as the level climbs
+  const SEV_STOPS = [
+    [1, [20, 151, 92]],
+    [4.5, [217, 144, 0]],
+    [7, [224, 96, 42]],
+    [10, [208, 47, 61]],
+  ];
+
+  function sevRgb(v) {
+    if (v <= SEV_STOPS[0][0]) return SEV_STOPS[0][1];
+    for (let i = 1; i < SEV_STOPS.length; i++) {
+      const [stop, c] = SEV_STOPS[i];
+      const [prev, pc] = SEV_STOPS[i - 1];
+      if (v <= stop) {
+        const t = (v - prev) / (stop - prev);
+        return pc.map((ch, j) => Math.round(ch + (c[j] - ch) * t));
+      }
+    }
+    return SEV_STOPS[SEV_STOPS.length - 1][1];
+  }
+
+  const sevColor = (v) => `rgb(${sevRgb(v).join(",")})`;
+  const sevTint = (v) => `rgba(${sevRgb(v).join(",")},0.16)`;
 
   // ---- Elements ----
   const $ = (id) => document.getElementById(id);
@@ -79,12 +108,28 @@
   function syncSlider(input, valueEl) {
     const v = Number(input.value);
     const pct = ((v - input.min) / (input.max - input.min)) * 100;
+    const sev = sevColor(v);
     input.style.setProperty("--pct", pct + "%");
-    valueEl.textContent = String(v);
+    input.style.setProperty("--sev", sev);
+    valueEl.style.setProperty("--sev", sev);
+    valueEl.textContent = fmt(v);
   }
 
-  levelInput.addEventListener("input", () => syncSlider(levelInput, levelValue));
-  syncSlider(levelInput, levelValue);
+  // the readout shakes past 7 and pulses red past 9
+  function applyScary(v) {
+    const amp = v >= 7 ? ((v - 7) / 3) * 3 : 0;
+    levelValue.style.setProperty("--amp", amp.toFixed(2) + "px");
+    levelValue.classList.toggle("danger", v >= 9);
+    levelValue.classList.toggle("shaking", v >= 7 && v < 9);
+  }
+
+  function syncMainSlider() {
+    syncSlider(levelInput, levelValue);
+    applyScary(Number(levelInput.value));
+  }
+
+  levelInput.addEventListener("input", syncMainSlider);
+  syncMainSlider();
 
   // ---- Logging ----
   let doneTimer = null;
@@ -92,7 +137,7 @@
   async function logEntry() {
     const entry = {
       id: newId(),
-      level: Number(levelInput.value),
+      level: round1(Number(levelInput.value)),
       note: noteInput.value.trim().slice(0, 200),
       createdAt: Date.now(),
       updatedAt: null,
@@ -106,7 +151,7 @@
     entries.unshift(entry);
     noteInput.value = "";
     levelInput.value = "5";
-    syncSlider(levelInput, levelValue);
+    syncMainSlider();
     render();
     logBtn.textContent = "Logged";
     logBtn.classList.add("done");
@@ -155,14 +200,24 @@
 
   function entryRow(entry) {
     const li = document.createElement("li");
-    li.className = "entry";
+    li.className = "entry" + (selectedId === entry.id ? " selected" : "");
 
     const main = document.createElement("div");
     main.className = "entry-main";
+    main.addEventListener("click", (e) => {
+      if (e.target.closest("button")) return;
+      selectedId = selectedId === entry.id ? null : entry.id;
+      render();
+      if (selectedId) {
+        const card = document.querySelector(".chart-card");
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    });
 
     const chip = document.createElement("span");
     chip.className = "chip";
-    chip.textContent = String(entry.level);
+    chip.textContent = fmt(entry.level);
+    chip.style.background = sevTint(entry.level);
 
     const body = document.createElement("div");
     body.className = "entry-body";
@@ -186,7 +241,8 @@
     editBtn.type = "button";
     editBtn.setAttribute("aria-label", "Edit entry");
     editBtn.innerHTML = ICON_EDIT;
-    editBtn.addEventListener("click", () => {
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // keep the row's select handler out of it
       editingId = editingId === entry.id ? null : entry.id;
       renderList();
     });
@@ -197,7 +253,8 @@
     delBtn.setAttribute("aria-label", "Delete entry");
     delBtn.innerHTML = ICON_DELETE;
     let confirmTimer = null;
-    delBtn.addEventListener("click", async () => {
+    delBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
       if (!delBtn.classList.contains("confirm")) {
         delBtn.classList.add("confirm");
         delBtn.textContent = "Sure?";
@@ -211,6 +268,7 @@
       await dbDelete(entry.id);
       entries = entries.filter((e) => e.id !== entry.id);
       if (editingId === entry.id) editingId = null;
+      if (selectedId === entry.id) selectedId = null;
       render();
     });
 
@@ -229,12 +287,12 @@
     const levelRow = document.createElement("div");
     levelRow.className = "edit-level";
     const out = document.createElement("output");
-    out.textContent = String(entry.level);
+    out.textContent = fmt(entry.level);
     const range = document.createElement("input");
     range.type = "range";
     range.min = "1";
     range.max = "10";
-    range.step = "1";
+    range.step = "0.1";
     range.value = String(entry.level);
     range.setAttribute("aria-label", "Tweak level from 1 to 10");
     range.addEventListener("input", () => syncSlider(range, out));
@@ -261,7 +319,7 @@
     save.type = "button";
     save.textContent = "Save";
     save.addEventListener("click", async () => {
-      entry.level = Number(range.value);
+      entry.level = round1(Number(range.value));
       entry.note = note.value.trim().slice(0, 200);
       entry.updatedAt = Date.now();
       await dbPut(entry);
@@ -377,16 +435,14 @@
     const hit = el("rect", { x: 0, y: 0, width, height: CHART_H, fill: "transparent" });
     hit.style.touchAction = "pan-y";
 
-    function showAt(clientX) {
+    // a selected list entry stays pinned on the chart
+    const pinnedIdx = selectedId ? pts.findIndex((p) => p.id === selectedId) : -1;
+
+    function showIndex(i) {
       const rect = svg.getBoundingClientRect();
       const scale = width / rect.width;
-      const px = (clientX - rect.left) * scale;
-      let best = 0;
-      for (let i = 1; i < coords.length; i++) {
-        if (Math.abs(coords[i][0] - px) < Math.abs(coords[best][0] - px)) best = i;
-      }
-      const p = pts[best];
-      const [cx, cy] = coords[best];
+      const p = pts[i];
+      const [cx, cy] = coords[i];
       cross.setAttribute("x1", cx);
       cross.setAttribute("x2", cx);
       cross.setAttribute("visibility", "visible");
@@ -394,7 +450,7 @@
       focusDot.setAttribute("cy", cy);
       focusDot.setAttribute("visibility", "visible");
 
-      tipValue.textContent = p.level + " / 10";
+      tipValue.textContent = fmt(p.level) + " / 10";
       tipTime.textContent = " " + timeLabel(p.createdAt);
       tipNote.textContent = p.note || "";
       tip.hidden = false;
@@ -406,17 +462,29 @@
       tip.style.top = rect.top - cardRect.top + cy / scale - tip.offsetHeight - 14 + "px";
     }
 
+    function nearestIndex(clientX) {
+      const rect = svg.getBoundingClientRect();
+      const scale = width / rect.width;
+      const px = (clientX - rect.left) * scale;
+      let best = 0;
+      for (let i = 1; i < coords.length; i++) {
+        if (Math.abs(coords[i][0] - px) < Math.abs(coords[best][0] - px)) best = i;
+      }
+      return best;
+    }
+
     function hide() {
       cross.setAttribute("visibility", "hidden");
       focusDot.setAttribute("visibility", "hidden");
       tip.hidden = true;
     }
 
-    hit.addEventListener("pointermove", (e) => showAt(e.clientX));
-    hit.addEventListener("pointerdown", (e) => showAt(e.clientX));
-    hit.addEventListener("pointerleave", hide);
+    hit.addEventListener("pointermove", (e) => showIndex(nearestIndex(e.clientX)));
+    hit.addEventListener("pointerdown", (e) => showIndex(nearestIndex(e.clientX)));
+    hit.addEventListener("pointerleave", () => (pinnedIdx >= 0 ? showIndex(pinnedIdx) : hide()));
 
     chartEl.appendChild(svg);
+    if (pinnedIdx >= 0) showIndex(pinnedIdx);
   }
 
   // ---- Render ----

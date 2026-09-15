@@ -1,4 +1,4 @@
-const CACHE = "tweaking-v1";
+const CACHE = "tweaking-v2";
 const ASSETS = [
   "./",
   "./index.html",
