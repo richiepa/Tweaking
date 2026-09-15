@@ -1,11 +1,12 @@
 # Tweaking
 
-Log how bad you're tweaking, 1 to 10. Slide to a number, add an optional note,
-done. History shows a list of entries and a chart over time. See
-[REQUIREMENTS.md](REQUIREMENTS.md) for the full spec.
+Log how bad you're tweaking, 1 to 10. Slide to a number, add an optional note
+or selfie, done. History shows a list of entries and a chart over time, and a
+device can hold multiple profiles, each with its own log and profile picture.
+See [REQUIREMENTS.md](REQUIREMENTS.md) for the full spec.
 
-Everything is stored in your browser's IndexedDB — **your log never leaves your
-device**. No accounts, no server, no tracking.
+Everything — entries, photos, profiles — is stored in your browser's IndexedDB.
+**Your log never leaves your device.** No sign-up, no server, no tracking.
 
 ## Running it
 

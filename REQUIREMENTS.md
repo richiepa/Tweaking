@@ -2,22 +2,21 @@
 
 ## Overview
 
-**Tweaking** is a dead-simple web app for logging how bad you're tweaking (e.g. over a girl) in the moment. Open it, slide to a number, optionally vent in one line, done. Over time you can look back at a list of your entries and a chart of your spiral.
+**Tweaking** is a dead-simple web app for logging how bad you're tweaking (e.g. over a girl) in the moment. Open it, slide to a number, optionally vent in one line or snap a selfie, done. Over time you can look back at a list of your entries and a chart of your spiral.
 
-Anyone can use it from any device via a link. Each person's log is **private to them and stored on their own device** — there are no accounts, no sign-up, and no server that ever sees the data.
+Anyone can use it from any device via a link. The device can hold several **profiles** (accounts), each with its own private log and optional profile picture. Everything is **stored on the device itself** — no sign-up, no server that ever sees the data.
 
 ## Goals
 
 - Logging an entry takes **under 10 seconds** from opening the app.
 - Works on any modern device (phone, tablet, laptop) through the browser.
 - Installable to the home screen like a real app (PWA).
-- Zero friction: no accounts, no onboarding, no settings required.
+- Zero friction: no sign-up, no onboarding, no settings required.
 
 ## Non-goals
 
 - No social features: no shared feeds, no seeing other people's logs, no leaderboards.
-- No accounts or cross-device sync. A person's log lives on the device they logged it on.
-- No tracking who the tweaking is *about* — entries are just level + note.
+- No cloud accounts or cross-device sync — profiles live on the device they were created on. (Cloud sync via a hosted backend is a possible later upgrade.)
 - No native iOS/Android apps.
 
 ## Functional requirements
@@ -26,64 +25,79 @@ Anyone can use it from any device via a link. Each person's log is **private to 
 
 1. The main screen is the logging screen — the app opens ready to log.
 2. An entry consists of:
-   - **Tweak level**: a number from **1.0 to 10.0 in 0.1 steps**, chosen via a fluid slider. Plain numbers only — no emoji scale. The scale escalates visually: the readout and slider shift from calm green through amber to red as the level climbs, with a shake animation from 7 up and a red pulse from 9 up (both disabled under `prefers-reduced-motion`).
-   - **Note** (optional): a short free-text one-liner (suggested cap: 200 characters).
-   - **Timestamp**: captured automatically at save time. Not user-editable at log time.
-3. Saving is a single action (one tap after picking the level). A brief confirmation shows the entry saved, then the app is ready for the next log.
+   - **Tweak level**: a number from **1.0 to 10.0 in 0.1 steps**, chosen via a fluid slider. Plain numbers only — no emoji scale. The scale escalates visually: the readout and slider shift from quiet tan through orange to red as the level climbs, with a shake animation from 7 up and a red pulse from 9 up (both disabled under `prefers-reduced-motion`).
+   - **Note** (optional): a short free-text one-liner (cap: 200 characters).
+   - **Photo** (optional): a selfie/pic taken at log time via the camera button (front camera on phones). Downscaled to ≤800px JPEG before storing, on the device only.
+   - **Timestamp**: captured automatically at save time.
+3. Saving is a single action. A brief confirmation shows the entry saved, then the app is ready for the next log.
 
 ### History
 
-4. A history view shows all past entries as a **list, newest first**, each showing level, note (if any), and when it was logged (relative time like "2h ago" for recent entries, date otherwise).
-5. A **trend chart** plots tweak level over time so the user can watch themselves spiral (or recover). It should handle both a handful of entries and hundreds gracefully.
-6. Any past entry can be **edited** (level and note) or **deleted**. Deleting asks for a one-tap confirmation; there is no undo.
-7. Tapping an entry in the list **selects** it: the row highlights and the chart pins that point (crosshair + tooltip), scrolling the chart into view. Tapping again deselects.
+4. A history view shows all past entries of the **active profile** as a list, newest first, each showing level, note, photo thumbnail (if any), and when it was logged (relative time for recent entries, date otherwise).
+5. A **trend chart** plots the active profile's tweak level over time. It handles both a handful of entries and hundreds gracefully.
+6. Any past entry can be **edited** (level, note; photo can be removed but not added later) or **deleted**. Deleting asks for a one-tap confirmation; there is no undo.
+7. Tapping an entry selects it: the row highlights and the chart pins that point (crosshair + tooltip), scrolling the chart into view. Tapping again deselects.
+8. Tapping an entry's photo thumbnail opens it full-size; tapping again closes it.
+
+### Profiles (accounts)
+
+9. The device holds one or more named profiles. A default profile ("Me") is created on first run, and entries logged before profiles existed are adopted by it.
+10. Each profile has a **name** and an optional **profile picture** (downscaled to ≤256px, stored on-device).
+11. The header shows the active profile's picture (or initial); tapping it opens the profile panel to **switch, add, edit, or delete** profiles.
+12. Each profile sees only its own entries and chart. The active profile is remembered on the device.
+13. Deleting a profile requires a one-tap confirmation and deletes its entries; the last remaining profile cannot be deleted. There are no passwords — profiles are for separating logs, not for security.
 
 ### Data & privacy
 
-8. All data is stored **locally on the device** (IndexedDB preferred over localStorage for durability and capacity). Nothing is ever sent to a server.
-9. The app must state this plainly somewhere visible (e.g. a footer line: "Your log never leaves this device").
-10. Because storage is on-device: clearing browser data wipes the log, and a log does not follow the user to a new device. This is an accepted trade-off, not a bug.
+14. All data — entries, photos, profiles — is stored **locally on the device** (IndexedDB). Nothing is ever sent to a server.
+15. The app states this plainly (footer: "Your log never leaves this device").
+16. Because storage is on-device: clearing browser data wipes everything, and a log does not follow the user to a new device. Accepted trade-off, not a bug.
 
 ## Non-functional requirements
 
 ### Platform & delivery
 
-11. Delivered as a **Progressive Web App**: a single URL that works in any modern mobile or desktop browser.
-12. Installable to the home screen (web app manifest with name, icon, theme color; standalone display mode).
-13. Works **fully offline** after first load (service worker caches the app shell). Logging while offline must work — there's no backend to reach anyway.
+17. Delivered as a **Progressive Web App**: a single URL that works in any modern mobile or desktop browser.
+18. Installable to the home screen (manifest with name, icon, theme color; standalone display mode).
+19. Works **fully offline** after first load. Page loads are network-first with cache fallback so new deploys appear on the next open.
 
 ### Usability
 
-14. Mobile-first layout; must be comfortably usable one-handed on a ~400px-wide phone screen. Also fine on desktop.
-15. Fast: interactive in well under 2 seconds on a mid-range phone.
-16. No login walls, cookie banners, popups, or interstitials of any kind between the user and the slider.
+20. Dark theme only — one committed charcoal-and-orange look.
+21. Mobile-first layout; comfortably usable one-handed at ~400px wide. Also fine on desktop.
+22. Fast: interactive in well under 2 seconds on a mid-range phone.
+23. No login walls, cookie banners, popups, or interstitials between the user and the slider.
 
 ### Tech constraints
 
-17. Keep the stack as small as the implementation allows — a static site (HTML/CSS/JS, optionally one small chart library) with no backend is the target architecture. No database server, no API, no auth service.
+24. Static site (HTML/CSS/JS), no build step, no backend, no database server, no auth service.
 
 ## Data model
 
-A single store of entries:
+`profiles` store:
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `id` | string | Unique per entry (e.g. UUID) |
-| `level` | number 1.0–10.0 | Required; one decimal place |
+| `id` | string | UUID |
+| `name` | string | ≤ 30 chars |
+| `avatar` | Blob or null | JPEG ≤ 256px |
+| `createdAt` | timestamp | |
+
+`entries` store:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | string | UUID |
+| `profileId` | string | Owning profile |
+| `level` | number 1.0–10.0 | One decimal place |
 | `note` | string | Optional, ≤ 200 chars |
-| `createdAt` | timestamp | Set automatically at save |
+| `photo` | Blob or null | JPEG ≤ 800px |
+| `createdAt` | timestamp | Set at save |
 | `updatedAt` | timestamp | Set on edit |
-
-## Assumptions (defaults taken; flag if wrong)
-
-- The trend chart plots individual entries over time (not daily averages). If logs get dense, the chart may aggregate visually but the underlying data stays per-entry.
-- Editing an entry does not change its position in history — `createdAt` stays fixed.
-- No data export/import in v1. Could be added later (e.g. JSON download) as a cheap insurance policy against the on-device storage trade-off.
-- App name is **Tweaking**; branding beyond the name (colors, icon) is left to the design/build phase.
 
 ## Out of scope for v1, possible later
 
+- Cloud accounts + sync (log follows you across devices) — needs a hosted backend, e.g. Supabase.
 - Export/import of the log (JSON file) for backup or device moves.
-- Reminders/notifications ("you haven't tweaked in 3 days?").
+- Reminders/notifications.
 - Tagging entries by who/what triggered them.
-- Accounts — considered and deliberately skipped for now (device profiles or cloud sync would be the two shapes).
