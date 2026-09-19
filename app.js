@@ -71,6 +71,13 @@
       : Date.now() + "-" + Math.random().toString(36).slice(2);
   }
 
+  function rememberRange(r) {
+    try { localStorage.setItem("tweaking-range", r); } catch (e) { /* private mode etc. */ }
+  }
+  function recallRange() {
+    try { return localStorage.getItem("tweaking-range"); } catch (e) { return null; }
+  }
+
   function rememberSession(id) {
     try {
       if (id) localStorage.setItem("tweaking-profile", id);
@@ -108,6 +115,17 @@
   let editingProfileId = null;
   let authMode = "login"; // or "register"
   let expanded = null; // {id, action: "switch" | "delete" | "setpw"} row expansion
+
+  // rolling time windows scoping the chart and the list
+  const RANGE_SPANS = { day: 86400e3, week: 7 * 86400e3, month: 30 * 86400e3, year: 365 * 86400e3 };
+  let rangeFilter = recallRange();
+  if (!RANGE_SPANS[rangeFilter] && rangeFilter !== "all") rangeFilter = "all";
+
+  function visibleEntries() {
+    if (rangeFilter === "all") return entries;
+    const cutoff = Date.now() - RANGE_SPANS[rangeFilter];
+    return entries.filter((e) => e.createdAt >= cutoff);
+  }
   let pendingPhoto = null; // blob attached to the next log
   let pendingSong = null; // {title, artist, art, preview} for the next log
   let pendingRegPic = null; // blob for the register form
@@ -162,6 +180,21 @@
   const songLabel = $("song-label");
   const songPlay = $("song-play");
   const songRemove = $("song-remove");
+  const rangeRow = $("range-row");
+
+  rangeRow.addEventListener("click", (e) => {
+    const btn = e.target.closest(".range-btn");
+    if (!btn) return;
+    rangeFilter = btn.dataset.range;
+    rememberRange(rangeFilter);
+    render();
+  });
+
+  function renderRangeRow() {
+    for (const b of rangeRow.querySelectorAll(".range-btn")) {
+      b.classList.toggle("active", b.dataset.range === rangeFilter);
+    }
+  }
 
   // ---- Object URL bookkeeping ----
   const liveUrls = [];
@@ -932,7 +965,15 @@
   function renderList() {
     revokeUrls(); // loaded imgs keep displaying; this only frees the handles
     listEl.textContent = "";
-    for (const entry of entries) {
+    const vis = visibleEntries();
+    if (entries.length && !vis.length) {
+      const li = document.createElement("li");
+      li.className = "range-empty";
+      li.textContent = "Nothing logged in this range.";
+      listEl.appendChild(li);
+      return;
+    }
+    for (const entry of vis) {
       listEl.appendChild(entryRow(entry));
     }
   }
@@ -1153,9 +1194,11 @@
     chartEl.textContent = "";
     const old = chartEl.parentElement.querySelector(".chart-tip");
     if (old) old.remove();
-    if (!entries.length) return;
+    const vis = visibleEntries();
+    chartEl.parentElement.hidden = !vis.length;
+    if (!vis.length) return;
 
-    const pts = [...entries].sort((a, b) => a.createdAt - b.createdAt);
+    const pts = [...vis].sort((a, b) => a.createdAt - b.createdAt);
     const width = Math.max(chartEl.clientWidth || 320, 200);
     const plotW = width - M.left - M.right;
     const plotH = CHART_H - M.top - M.bottom;
@@ -1312,6 +1355,7 @@
     const has = entries.length > 0;
     historyEl.hidden = !has;
     emptyEl.hidden = has;
+    renderRangeRow();
     renderList();
     renderChart();
     renderHeader();

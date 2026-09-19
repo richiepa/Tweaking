@@ -463,6 +463,26 @@ button {
   border: 1px solid var(--border);
 }
 
+/* ---- Time range filter ---- */
+.range-row { display: flex; gap: 6px; margin-top: 20px; }
+.range-btn {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--ink-2);
+  border-radius: 12px;
+}
+.range-btn:hover { background: var(--surface-2); }
+.range-btn.active { background: var(--accent); color: var(--accent-ink); }
+.range-empty {
+  list-style: none;
+  text-align: center;
+  color: var(--muted);
+  padding: 16px 0;
+}
+
 /* ---- Chart ---- */
 .chart-card { position: relative; padding: 10px 10px 6px; }
 #chart svg { display: block; width: 100%; height: auto; }
