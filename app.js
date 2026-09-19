@@ -319,9 +319,18 @@
   }
 
   async function searchSongs(q) {
-    const data = await jsonp(
-      "https://itunes.apple.com/search?media=music&entity=song&limit=6&term=" + encodeURIComponent(q)
-    );
+    const url = "https://itunes.apple.com/search?media=music&entity=song&limit=6&term=" + encodeURIComponent(q);
+    let data;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      const resp = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error("http " + resp.status);
+      data = await resp.json();
+    } catch (err) {
+      data = await jsonp(url); // fallback for engines that block the CORS fetch
+    }
     return (data.results || []).map((r) => ({
       title: r.trackName || "",
       artist: r.artistName || "",
