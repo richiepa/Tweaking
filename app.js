@@ -7,6 +7,12 @@
     '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
   const ICON_DELETE =
     '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+  const ICON_MUSIC =
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+  const ICON_PLAY =
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+  const ICON_PAUSE =
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6z"/><path d="M14 5h4v14h-4z"/></svg>';
 
   // ---- Storage (IndexedDB) ----
   const DB_NAME = "tweaking";
@@ -103,6 +109,7 @@
   let authMode = "login"; // or "register"
   let expanded = null; // {id, action: "switch" | "delete" | "setpw"} row expansion
   let pendingPhoto = null; // blob attached to the next log
+  let pendingSong = null; // {title, artist, art, preview} for the next log
   let pendingRegPic = null; // blob for the register form
 
   // ---- Elements ----
@@ -146,6 +153,15 @@
   const installLink = $("install-link");
   const installAction = $("install-action");
   const installBtn = $("install-btn");
+  const songBtn = $("song-btn");
+  const songSearch = $("song-search");
+  const songQuery = $("song-query");
+  const songResults = $("song-results");
+  const songAttached = $("song-attached");
+  const songArt = $("song-art");
+  const songLabel = $("song-label");
+  const songPlay = $("song-play");
+  const songRemove = $("song-remove");
 
   // ---- Object URL bookkeeping ----
   const liveUrls = [];
@@ -265,6 +281,163 @@
     photoThumb.removeAttribute("src");
     photoPreview.hidden = true;
   }
+
+  // ---- Notes grow with their text ----
+  function autosize(el) {
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 132) + "px";
+  }
+  noteInput.addEventListener("input", () => autosize(noteInput));
+
+  // ---- Songs (Instagram-notes style, via the iTunes Search API) ----
+  // The catalog lookup and 30s previews come from Apple; only the search
+  // text leaves the device — never the log itself.
+  function jsonp(url, timeoutMs) {
+    return new Promise((resolve, reject) => {
+      const cb = "itcb" + Date.now() + Math.floor(Math.random() * 1e6);
+      const script = document.createElement("script");
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error("timeout"));
+      }, timeoutMs || 8000);
+      function cleanup() {
+        clearTimeout(timer);
+        delete window[cb];
+        script.remove();
+      }
+      window[cb] = (data) => {
+        cleanup();
+        resolve(data);
+      };
+      script.onerror = () => {
+        cleanup();
+        reject(new Error("network"));
+      };
+      script.src = url + "&callback=" + cb;
+      document.head.appendChild(script);
+    });
+  }
+
+  async function searchSongs(q) {
+    const data = await jsonp(
+      "https://itunes.apple.com/search?media=music&entity=song&limit=6&term=" + encodeURIComponent(q)
+    );
+    return (data.results || []).map((r) => ({
+      title: r.trackName || "",
+      artist: r.artistName || "",
+      art: r.artworkUrl100 || "",
+      preview: r.previewUrl || "",
+    }));
+  }
+
+  // one shared preview player; whichever button started it owns the icon
+  const previewAudio = new Audio();
+  let playingBtn = null;
+  function resetPlayingBtn() {
+    if (playingBtn) playingBtn.innerHTML = ICON_PLAY;
+    playingBtn = null;
+  }
+  previewAudio.addEventListener("ended", resetPlayingBtn);
+  previewAudio.addEventListener("pause", resetPlayingBtn);
+
+  function togglePreview(song, btn) {
+    if (!song.preview) return;
+    if (playingBtn === btn && !previewAudio.paused) {
+      previewAudio.pause();
+      return;
+    }
+    previewAudio.pause();
+    previewAudio.src = song.preview;
+    previewAudio.play().then(() => {
+      playingBtn = btn;
+      btn.innerHTML = ICON_PAUSE;
+    }).catch(() => {});
+  }
+
+  function songHint(text) {
+    songResults.textContent = "";
+    const li = document.createElement("li");
+    li.className = "song-hint";
+    li.textContent = text;
+    songResults.appendChild(li);
+  }
+
+  function renderSongResults(songs) {
+    songResults.textContent = "";
+    if (!songs.length) {
+      songHint("No matches.");
+      return;
+    }
+    for (const song of songs) {
+      const li = document.createElement("li");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      const art = document.createElement("img");
+      art.className = "song-art";
+      art.alt = "";
+      art.src = song.art;
+      art.addEventListener("error", () => (art.hidden = true));
+      const meta = document.createElement("span");
+      meta.className = "song-meta";
+      const title = document.createElement("span");
+      title.className = "song-title";
+      title.textContent = song.title;
+      const artist = document.createElement("span");
+      artist.className = "song-artist";
+      artist.textContent = song.artist;
+      meta.append(title, artist);
+      btn.append(art, meta);
+      btn.addEventListener("click", () => attachSong(song));
+      li.appendChild(btn);
+      songResults.appendChild(li);
+    }
+  }
+
+  function attachSong(song) {
+    pendingSong = song;
+    songSearch.hidden = true;
+    songQuery.value = "";
+    songResults.textContent = "";
+    songLabel.textContent = song.title + " · " + song.artist;
+    songArt.src = song.art;
+    songArt.hidden = !song.art;
+    songPlay.innerHTML = ICON_PLAY;
+    songAttached.hidden = false;
+  }
+
+  function clearPendingSong() {
+    pendingSong = null;
+    songAttached.hidden = true;
+    songArt.removeAttribute("src");
+    songLabel.textContent = "";
+  }
+
+  songBtn.addEventListener("click", () => {
+    songSearch.hidden = !songSearch.hidden;
+    if (!songSearch.hidden) songQuery.focus();
+  });
+  songPlay.addEventListener("click", () => {
+    if (pendingSong) togglePreview(pendingSong, songPlay);
+  });
+  songRemove.addEventListener("click", clearPendingSong);
+
+  let songTimer = null;
+  songQuery.addEventListener("input", () => {
+    clearTimeout(songTimer);
+    const q = songQuery.value.trim();
+    if (q.length < 2) {
+      songResults.textContent = "";
+      return;
+    }
+    songHint("Searching…");
+    songTimer = setTimeout(async () => {
+      try {
+        renderSongResults(await searchSongs(q));
+      } catch (err) {
+        songHint("Couldn't reach song search — are you online?");
+      }
+    }, 400);
+  });
 
   // ---- Auth ----
   function activeProfile() {
@@ -691,8 +864,9 @@
       id: newId(),
       profileId: activeProfileId,
       level: round1(Number(levelInput.value)),
-      note: noteInput.value.trim().slice(0, 200),
+      note: noteInput.value.trim().slice(0, 2000),
       photo: pendingPhoto,
+      song: pendingSong,
       createdAt: Date.now(),
       updatedAt: null,
     };
@@ -704,8 +878,11 @@
     }
     entries.unshift(entry);
     noteInput.value = "";
+    autosize(noteInput);
     levelInput.value = "5";
     clearPendingPhoto();
+    clearPendingSong();
+    songSearch.hidden = true;
     syncMainSlider();
     render();
     logBtn.textContent = "Logged";
@@ -718,9 +895,6 @@
   }
 
   logBtn.addEventListener("click", logEntry);
-  noteInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") logEntry();
-  });
 
   // ---- Time formatting ----
   function timeLabel(ts) {
@@ -783,6 +957,35 @@
       note.textContent = entry.note;
       body.appendChild(note);
     }
+    if (entry.song) {
+      const songLine = document.createElement("button");
+      songLine.className = "song-line";
+      songLine.type = "button";
+      songLine.setAttribute("aria-label", "Play song preview");
+      const ico = document.createElement("span");
+      ico.className = "song-ico";
+      ico.innerHTML = ICON_MUSIC;
+      const art = document.createElement("img");
+      art.className = "song-art";
+      art.alt = "";
+      if (entry.song.art) art.src = entry.song.art;
+      else art.hidden = true;
+      art.addEventListener("error", () => (art.hidden = true));
+      const label = document.createElement("span");
+      label.className = "song-label";
+      label.textContent = entry.song.title + " · " + entry.song.artist;
+      const play = document.createElement("span");
+      play.className = "song-ico";
+      play.innerHTML = ICON_PLAY;
+      if (entry.song.art) songLine.append(art, label, play);
+      else songLine.append(ico, label, play);
+      songLine.addEventListener("click", (e) => {
+        e.stopPropagation();
+        togglePreview(entry.song, play);
+      });
+      body.appendChild(songLine);
+    }
+
     const time = document.createElement("span");
     time.className = "entry-time";
     time.textContent = timeLabel(entry.createdAt) + (entry.updatedAt ? " · edited" : "");
@@ -870,13 +1073,16 @@
     range.addEventListener("input", () => syncSlider(range, out));
     levelRow.append(out, range);
 
-    const note = document.createElement("input");
-    note.type = "text";
-    note.maxLength = 200;
+    const note = document.createElement("textarea");
+    note.maxLength = 2000;
+    note.rows = 1;
     note.placeholder = "note (optional)";
     note.value = entry.note || "";
+    note.addEventListener("input", () => autosize(note));
+    requestAnimationFrame(() => autosize(note));
 
     let removePhoto = false;
+    let removeSong = false;
     const actions = document.createElement("div");
     actions.className = "edit-actions";
     if (entry.photo) {
@@ -889,6 +1095,17 @@
         dropPic.textContent = removePhoto ? "Photo will be removed" : "Remove photo";
       });
       actions.appendChild(dropPic);
+    }
+    if (entry.song) {
+      const dropSong = document.createElement("button");
+      dropSong.className = "ghost small";
+      dropSong.type = "button";
+      dropSong.textContent = "Remove song";
+      dropSong.addEventListener("click", () => {
+        removeSong = !removeSong;
+        dropSong.textContent = removeSong ? "Song will be removed" : "Remove song";
+      });
+      actions.appendChild(dropSong);
     }
     const cancel = document.createElement("button");
     cancel.className = "ghost small";
@@ -904,8 +1121,9 @@
     save.textContent = "Save";
     save.addEventListener("click", async () => {
       entry.level = round1(Number(range.value));
-      entry.note = note.value.trim().slice(0, 200);
+      entry.note = note.value.trim().slice(0, 2000);
       if (removePhoto) entry.photo = null;
+      if (removeSong) entry.song = null;
       entry.updatedAt = Date.now();
       await dbPut(ENTRIES, entry);
       editingId = null;

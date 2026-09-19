@@ -167,8 +167,108 @@ body {
 .pic-btn.has-pic { color: var(--accent); }
 .log-card .pic-btn { background: #3a352f; color: #9d9587; }
 
-.note-row { display: flex; gap: 8px; align-items: center; }
-.note-row input[type="text"] { flex: 1; min-width: 0; }
+.note-row { display: flex; gap: 8px; align-items: flex-end; }
+.note-row textarea { flex: 1; min-width: 0; }
+
+textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--page);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.4;
+  resize: none;
+  overflow-y: auto;
+}
+textarea::placeholder { color: var(--muted); }
+textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.log-card textarea {
+  background: #3a352f;
+  border: none;
+  color: #f5f1ea;
+}
+.log-card textarea::placeholder { color: #9d9587; }
+
+/* ---- Songs ---- */
+.song-search { margin-top: 10px; }
+.song-results { list-style: none; margin: 4px 0 0; padding: 0; }
+.song-results button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  border-radius: 10px;
+}
+.log-card .song-results button:hover { background: #3a352f; }
+.song-art {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
+}
+.song-meta { flex: 1; min-width: 0; }
+.song-title {
+  display: block;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.song-artist {
+  display: block;
+  font-size: 12px;
+  color: #9d9587;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.song-hint { padding: 8px; font-size: 13px; color: #9d9587; }
+.song-attached {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.song-attached .song-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.song-play { color: inherit; }
+.song-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: var(--surface-2);
+  border-radius: 10px;
+  color: inherit;
+  text-align: left;
+}
+.song-line .song-art { width: 24px; height: 24px; border-radius: 6px; }
+.song-line .song-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.song-ico { display: grid; place-items: center; color: var(--accent); }
 
 .photo-preview {
   display: flex;
@@ -416,8 +516,18 @@ button {
 }
 .entry-body { flex: 1; min-width: 0; }
 .entry-note {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+/* selecting an entry reveals the whole note */
+.entry.selected .entry-note {
+  -webkit-line-clamp: unset;
+  line-clamp: none;
 }
 .entry-time { display: block; font-size: 12px; color: var(--muted); }
 .entry-actions { display: flex; gap: 4px; }
@@ -451,7 +561,7 @@ button {
   color: var(--sev, var(--ink));
 }
 .edit-level input[type="range"] { flex: 1; }
-.edit-form input[type="text"] { margin-top: 4px; }
+.edit-form input[type="text"], .edit-form textarea { margin-top: 4px; }
 .edit-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
 
 .empty {

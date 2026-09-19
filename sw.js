@@ -1,4 +1,4 @@
-const CACHE = "tweaking-v7";
+const CACHE = "tweaking-v8";
 const ASSETS = [
   "./",
   "./index.html",
@@ -27,6 +27,8 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
+  // cross-origin (song search, artwork, previews) goes straight to the network
+  if (new URL(e.request.url).origin !== location.origin) return;
   // Navigations go network-first so a new deploy shows up on the next open;
   // the cache is the offline fallback. Assets stay cache-first (each deploy
   // bumps CACHE, which refreshes them).

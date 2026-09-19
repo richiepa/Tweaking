@@ -26,16 +26,17 @@ Anyone can use it from any device via a link. First-time users **register an acc
 1. The main screen is the logging screen — the app opens ready to log.
 2. An entry consists of:
    - **Tweak level**: a number from **1.0 to 10.0 in 0.1 steps**, chosen via a fluid slider. Plain numbers only — no emoji scale. The scale escalates visually: the readout and slider shift from quiet tan through orange to red as the level climbs, with a shake animation from 7 up and a red pulse from 9 up (both disabled under `prefers-reduced-motion`).
-   - **Note** (optional): a short free-text one-liner (cap: 200 characters).
+   - **Note** (optional): free text, multi-line, up to 2000 characters, in a field that grows as you type.
    - **Photo** (optional): a selfie/pic taken at log time via the camera button (front camera on phones). Downscaled to ≤800px JPEG before storing, on the device only.
+   - **Song** (optional): Instagram-Notes-style — the music button opens a song search (Apple's iTunes catalog), picking a result attaches it with title, artist, and artwork, and a 30-second preview can be played before logging. Attaching a song sends only the search text to Apple; artwork and previews stream from Apple's servers.
    - **Timestamp**: captured automatically at save time.
 3. Saving is a single action. A brief confirmation shows the entry saved, then the app is ready for the next log.
 
 ### History
 
-4. A history view shows all past entries of the **active profile** as a list, newest first, each showing level, note, photo thumbnail (if any), and when it was logged (relative time for recent entries, date otherwise).
+4. A history view shows all past entries of the **active profile** as a list, newest first, each showing level, note (clamped to 3 lines; selecting the entry reveals it in full), photo thumbnail, song (tappable to play/pause its 30s preview — one preview plays at a time), and when it was logged.
 5. A **trend chart** plots the active profile's tweak level over time. It handles both a handful of entries and hundreds gracefully.
-6. Any past entry can be **edited** (level, note; photo can be removed but not added later) or **deleted**. Deleting asks for a one-tap confirmation; there is no undo.
+6. Any past entry can be **edited** (level, note; photo and song can be removed but not added later) or **deleted**. Deleting asks for a one-tap confirmation; there is no undo.
 7. Tapping an entry selects it: the row highlights and the chart pins that point (crosshair + tooltip), scrolling the chart into view. Tapping again deselects.
 8. Tapping an entry's photo thumbnail opens it full-size; tapping again closes it.
 
@@ -50,7 +51,7 @@ Anyone can use it from any device via a link. First-time users **register an acc
 
 ### Data & privacy
 
-15. All data — entries, photos, profiles — is stored **locally on the device** (IndexedDB). Nothing is ever sent to a server.
+15. All data — entries, photos, songs, profiles — is stored **locally on the device** (IndexedDB). The log is never sent to a server. The one external call is the optional song feature: search text goes to Apple's public iTunes Search API, and artwork/previews stream from Apple. Song search degrades gracefully offline.
 16. The app states this plainly (footer: "Your log never leaves this device").
 17. Because storage is on-device: clearing browser data wipes everything, and a log does not follow the user to a new device. Accepted trade-off, not a bug.
 
@@ -92,8 +93,9 @@ Anyone can use it from any device via a link. First-time users **register an acc
 | `id` | string | UUID |
 | `profileId` | string | Owning profile |
 | `level` | number 1.0–10.0 | One decimal place |
-| `note` | string | Optional, ≤ 200 chars |
+| `note` | string | Optional, multi-line, ≤ 2000 chars |
 | `photo` | Blob or null | JPEG ≤ 800px |
+| `song` | object or null | `{title, artist, art, preview}` — iTunes metadata + URLs |
 | `createdAt` | timestamp | Set at save |
 | `updatedAt` | timestamp | Set on edit |
 
