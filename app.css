@@ -463,19 +463,23 @@ button {
   border: 1px solid var(--border);
 }
 
-/* ---- Time range filter ---- */
-.range-row { display: flex; gap: 6px; margin-top: 20px; }
-.range-btn {
-  flex: 1;
-  padding: 8px 0;
-  font-size: 13px;
-  font-weight: 600;
-  background: var(--surface);
-  color: var(--ink-2);
-  border-radius: 12px;
+/* ---- Trend header: window readout + reset ---- */
+.trend-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 24px 0 8px;
 }
-.range-btn:hover { background: var(--surface-2); }
-.range-btn.active { background: var(--accent); color: var(--accent-ink); }
+.trend-head h2 { margin: 0; }
+.trend-window {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#trend-reset { padding: 4px 12px; font-size: 12px; }
 .range-empty {
   list-style: none;
   text-align: center;
@@ -484,7 +488,13 @@ button {
 }
 
 /* ---- Chart ---- */
-.chart-card { position: relative; padding: 10px 10px 6px; }
+.chart-card {
+  position: relative;
+  padding: 10px 10px 6px;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
 #chart svg { display: block; width: 100%; height: auto; }
 .chart-tip {
   position: absolute;

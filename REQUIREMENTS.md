@@ -36,7 +36,7 @@ Anyone can use it from any device via a link. First-time users **register an acc
 
 4. A history view shows all past entries of the **active profile** as a list, newest first, each showing level, note (clamped to 3 lines; selecting the entry reveals it in full), photo thumbnail, song (tappable to play/pause its 30s preview — one preview plays at a time), and when it was logged.
 5. A **trend chart** plots the active profile's tweak level over time. It handles both a handful of entries and hundreds gracefully.
-5b. A **time-range filter** (Day / Week / Month / Year / All — rolling windows) sits above the chart and scopes both the chart and the list together. The choice is remembered on the device; an empty range says so instead of showing a blank chart.
+5b. The chart's time window is navigated **directly on the chart**: pinch (two fingers, or ctrl+scroll on a trackpad) zooms the range in and out around the gesture point, dragging left/right pans back and forward in time, and a tap shows the nearest entry's tooltip. The entries list follows the visible window. The Trend header shows the current window with an **All** button (double-tap also resets); zooming out past the data snaps back to the full view, panning is clamped so the data can't be lost off-screen, and an empty window says so in the list instead of hiding the chart.
 6. Any past entry can be **edited** (level, note; photo and song can be removed but not added later) or **deleted**. Deleting asks for a one-tap confirmation; there is no undo.
 7. Tapping an entry selects it: the row highlights and the chart pins that point (crosshair + tooltip), scrolling the chart into view. Tapping again deselects.
 8. Tapping an entry's photo thumbnail opens it full-size; tapping again closes it.

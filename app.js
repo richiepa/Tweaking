@@ -71,13 +71,6 @@
       : Date.now() + "-" + Math.random().toString(36).slice(2);
   }
 
-  function rememberRange(r) {
-    try { localStorage.setItem("tweaking-range", r); } catch (e) { /* private mode etc. */ }
-  }
-  function recallRange() {
-    try { return localStorage.getItem("tweaking-range"); } catch (e) { return null; }
-  }
-
   function rememberSession(id) {
     try {
       if (id) localStorage.setItem("tweaking-profile", id);
@@ -116,15 +109,28 @@
   let authMode = "login"; // or "register"
   let expanded = null; // {id, action: "switch" | "delete" | "setpw"} row expansion
 
-  // rolling time windows scoping the chart and the list
-  const RANGE_SPANS = { day: 86400e3, week: 7 * 86400e3, month: 30 * 86400e3, year: 365 * 86400e3 };
-  let rangeFilter = recallRange();
-  if (!RANGE_SPANS[rangeFilter] && rangeFilter !== "all") rangeFilter = "all";
+  // the chart's visible time window: null = everything; pan/pinch sets it
+  let viewStart = null;
+  let viewEnd = null;
+
+  function fullWindow() {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const e of entries) {
+      if (e.createdAt < lo) lo = e.createdAt;
+      if (e.createdAt > hi) hi = e.createdAt;
+    }
+    if (hi - lo < 60e3) {
+      // one point (or a burst): pad so it doesn't sit on an edge
+      lo -= 3600e3;
+      hi += 3600e3;
+    }
+    return [lo, hi];
+  }
 
   function visibleEntries() {
-    if (rangeFilter === "all") return entries;
-    const cutoff = Date.now() - RANGE_SPANS[rangeFilter];
-    return entries.filter((e) => e.createdAt >= cutoff);
+    if (viewStart == null) return entries;
+    return entries.filter((e) => e.createdAt >= viewStart && e.createdAt <= viewEnd);
   }
   let pendingPhoto = null; // blob attached to the next log
   let pendingSong = null; // {title, artist, art, preview} for the next log
@@ -180,20 +186,22 @@
   const songLabel = $("song-label");
   const songPlay = $("song-play");
   const songRemove = $("song-remove");
-  const rangeRow = $("range-row");
+  const trendWindow = $("trend-window");
+  const trendReset = $("trend-reset");
 
-  rangeRow.addEventListener("click", (e) => {
-    const btn = e.target.closest(".range-btn");
-    if (!btn) return;
-    rangeFilter = btn.dataset.range;
-    rememberRange(rangeFilter);
-    render();
-  });
-
-  function renderRangeRow() {
-    for (const b of rangeRow.querySelectorAll(".range-btn")) {
-      b.classList.toggle("active", b.dataset.range === rangeFilter);
+  function renderTrendHead() {
+    if (viewStart == null) {
+      trendWindow.textContent = "drag to move · pinch to zoom";
+      trendReset.hidden = true;
+      return;
     }
+    const spansDays = viewEnd - viewStart > 86400e3;
+    const d = (t) => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const tm = (t) => new Date(t).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    trendWindow.textContent = spansDays
+      ? d(viewStart) + " – " + d(viewEnd)
+      : d(viewStart) + ", " + tm(viewStart) + " – " + tm(viewEnd);
+    trendReset.hidden = false;
   }
 
   // ---- Object URL bookkeeping ----
@@ -503,6 +511,8 @@
     selectedId = null;
     editingProfileId = null;
     expanded = null;
+    viewStart = null;
+    viewEnd = null;
     profilePanel.hidden = true;
     showAuthError("");
     entries = await loadEntries();
@@ -1189,27 +1199,27 @@
   // ---- Trend chart ----
   const M = { top: 14, right: 14, bottom: 26, left: 28 };
   const CHART_H = 190;
+  const MIN_SPAN = 30 * 60e3; // zoom floor: half an hour
+  let chartGeom = null; // current svg metrics, for gesture math
+  let chartApi = null; // tap-to-tooltip hook for the gesture layer
 
   function renderChart() {
     chartEl.textContent = "";
     const old = chartEl.parentElement.querySelector(".chart-tip");
     if (old) old.remove();
-    const vis = visibleEntries();
-    chartEl.parentElement.hidden = !vis.length;
-    if (!vis.length) return;
+    chartGeom = null;
+    chartApi = null;
+    if (!entries.length) return;
 
-    const pts = [...vis].sort((a, b) => a.createdAt - b.createdAt);
+    const [f0, f1] = fullWindow();
+    const t0 = viewStart != null ? viewStart : f0;
+    const t1 = viewStart != null ? viewEnd : f1;
+
+    const pts = [...entries].sort((a, b) => a.createdAt - b.createdAt);
     const width = Math.max(chartEl.clientWidth || 320, 200);
     const plotW = width - M.left - M.right;
     const plotH = CHART_H - M.top - M.bottom;
 
-    let t0 = pts[0].createdAt;
-    let t1 = pts[pts.length - 1].createdAt;
-    if (t1 - t0 < 60e3) {
-      // one point (or a burst): pad the domain so it doesn't sit on an edge
-      t0 -= 3600e3;
-      t1 += 3600e3;
-    }
     const x = (t) => M.left + ((t - t0) / (t1 - t0)) * plotW;
     const y = (v) => M.top + (1 - (v - 1) / 9) * plotH;
 
@@ -1247,14 +1257,29 @@
       lbl.textContent = tickLabel(t, spansDays);
     });
 
-    // area wash + line
+    // clip marks to the plot area so panned-out points don't spill
+    const clip = el("clipPath", { id: "plot-clip" });
+    el("rect", { x: M.left - 8, y: 0, width: plotW + 16, height: M.top + plotH + 8 }, clip);
+    const marks = el("g", { "clip-path": "url(#plot-clip)" });
+
+    // indices inside the window (the line keeps one neighbor each side)
     const coords = pts.map((p) => [x(p.createdAt), y(p.level)]);
-    if (coords.length > 1) {
-      const line = coords.map((c, i) => (i ? "L" : "M") + c[0].toFixed(1) + " " + c[1].toFixed(1)).join(" ");
+    let i0 = pts.findIndex((p) => p.createdAt >= t0);
+    if (i0 === -1) i0 = pts.length;
+    let i1 = pts.length - 1;
+    while (i1 >= 0 && pts[i1].createdAt > t1) i1--;
+    const winIdx = [];
+    for (let i = i0; i <= i1; i++) winIdx.push(i);
+
+    const a = Math.max(0, i0 - 1);
+    const b = Math.min(pts.length - 1, i1 + 1);
+    if (b > a) {
+      const seg = coords.slice(a, b + 1);
+      const line = seg.map((c, i) => (i ? "L" : "M") + c[0].toFixed(1) + " " + c[1].toFixed(1)).join(" ");
       el("path", {
-        d: `${line} L ${coords[coords.length - 1][0].toFixed(1)} ${y(1)} L ${coords[0][0].toFixed(1)} ${y(1)} Z`,
+        d: `${line} L ${seg[seg.length - 1][0].toFixed(1)} ${y(1)} L ${seg[0][0].toFixed(1)} ${y(1)} Z`,
         fill: css("wash"),
-      });
+      }, marks);
       el("path", {
         d: line,
         fill: "none",
@@ -1262,13 +1287,13 @@
         "stroke-width": 2,
         "stroke-linejoin": "round",
         "stroke-linecap": "round",
-      });
+      }, marks);
     }
 
     // dots (skip when dense, keep the endpoint)
-    const dotPts = coords.length <= 60 ? coords : [coords[coords.length - 1]];
-    for (const [cx, cy] of dotPts) {
-      el("circle", { cx, cy, r: 4, fill: css("accent"), stroke: css("surface"), "stroke-width": 2 });
+    const dotIdx = winIdx.length <= 60 ? winIdx : [winIdx[winIdx.length - 1]];
+    for (const i of dotIdx) {
+      el("circle", { cx: coords[i][0], cy: coords[i][1], r: 4, fill: css("accent"), stroke: css("surface"), "stroke-width": 2 }, marks);
     }
 
     // hover: crosshair + tooltip snapping to the nearest entry
@@ -1288,10 +1313,9 @@
     card.appendChild(tip);
 
     const hit = el("rect", { x: 0, y: 0, width, height: CHART_H, fill: "transparent" });
-    hit.style.touchAction = "pan-y";
 
-    // a selected list entry stays pinned on the chart
-    const pinnedIdx = selectedId ? pts.findIndex((p) => p.id === selectedId) : -1;
+    // a selected list entry stays pinned on the chart (when in the window)
+    const pinnedIdx = selectedId ? winIdx.find((i) => pts[i].id === selectedId) ?? -1 : -1;
 
     function showIndex(i) {
       const rect = svg.getBoundingClientRect();
@@ -1318,11 +1342,12 @@
     }
 
     function nearestIndex(clientX) {
+      if (!winIdx.length) return -1;
       const rect = svg.getBoundingClientRect();
       const scale = width / rect.width;
       const px = (clientX - rect.left) * scale;
-      let best = 0;
-      for (let i = 1; i < coords.length; i++) {
+      let best = winIdx[0];
+      for (const i of winIdx) {
         if (Math.abs(coords[i][0] - px) < Math.abs(coords[best][0] - px)) best = i;
       }
       return best;
@@ -1334,13 +1359,185 @@
       tip.hidden = true;
     }
 
-    hit.addEventListener("pointermove", (e) => showIndex(nearestIndex(e.clientX)));
-    hit.addEventListener("pointerdown", (e) => showIndex(nearestIndex(e.clientX)));
+    hit.addEventListener("pointermove", (e) => {
+      if (e.pointerType !== "mouse" || activePtrs.size) return;
+      const i = nearestIndex(e.clientX);
+      if (i >= 0) showIndex(i);
+    });
     hit.addEventListener("pointerleave", () => (pinnedIdx >= 0 ? showIndex(pinnedIdx) : hide()));
 
     chartEl.appendChild(svg);
+    chartGeom = { svg, width, plotW, left: M.left, t0, t1 };
+    chartApi = {
+      tapAt: (clientX) => {
+        const i = nearestIndex(clientX);
+        if (i >= 0) showIndex(i);
+      },
+    };
     if (pinnedIdx >= 0) showIndex(pinnedIdx);
   }
+
+  // ---- Chart gestures: drag to pan, pinch (or ctrl+wheel) to zoom ----
+  const chartCard = document.querySelector(".chart-card");
+  const activePtrs = new Map();
+  let panMode = false;
+  let panLastX = 0;
+  let tapStart = null;
+  let pinchLast = null;
+  let listDirty = false;
+  let chartRaf = false;
+  let wheelTimer = null;
+
+  function currentWindow() {
+    return viewStart != null ? [viewStart, viewEnd] : fullWindow();
+  }
+
+  function setWindow(vs, ve) {
+    const [f0, f1] = fullWindow();
+    const extent = Math.max(f1 - f0, MIN_SPAN);
+    let span = ve - vs;
+    if (span < MIN_SPAN) {
+      const c = (vs + ve) / 2;
+      vs = c - MIN_SPAN / 2;
+      ve = c + MIN_SPAN / 2;
+      span = MIN_SPAN;
+    }
+    if (span > extent * 1.15) {
+      const c = (vs + ve) / 2;
+      span = extent * 1.15;
+      vs = c - span / 2;
+      ve = c + span / 2;
+    }
+    // keep the window's center over the data so you can always pan back
+    const c = (vs + ve) / 2;
+    if (c < f0) { vs += f0 - c; ve += f0 - c; }
+    if (c > f1) { vs -= c - f1; ve -= c - f1; }
+    if (vs <= f0 && ve >= f1) {
+      viewStart = null;
+      viewEnd = null;
+    } else {
+      viewStart = vs;
+      viewEnd = ve;
+    }
+    listDirty = true;
+    if (!chartRaf) {
+      chartRaf = true;
+      requestAnimationFrame(() => {
+        chartRaf = false;
+        renderChart();
+        renderTrendHead();
+      });
+    }
+  }
+
+  function flushList() {
+    if (!listDirty) return;
+    listDirty = false;
+    renderList();
+  }
+
+  // Read the SVG's box live each time — layout can shift between the render
+  // that built the chart and the gesture that drives it.
+  function timeAtClientX(clientX) {
+    const g = chartGeom;
+    const rect = g.svg.getBoundingClientRect();
+    const [vs, ve] = currentWindow();
+    const px = (clientX - rect.left) * (g.width / rect.width);
+    return vs + ((px - g.left) / g.plotW) * (ve - vs);
+  }
+
+  function panByPx(dxClient) {
+    const g = chartGeom;
+    if (!g) return;
+    const rect = g.svg.getBoundingClientRect();
+    const [vs, ve] = currentWindow();
+    const dt = (-(dxClient * (g.width / rect.width)) / g.plotW) * (ve - vs);
+    setWindow(vs + dt, ve + dt);
+  }
+
+  function zoomAround(clientX, factor) { // factor > 1 zooms in
+    if (!chartGeom) return;
+    const [vs, ve] = currentWindow();
+    const tc = timeAtClientX(clientX);
+    setWindow(tc - (tc - vs) / factor, tc + (ve - tc) / factor);
+  }
+
+  function resetView() {
+    viewStart = null;
+    viewEnd = null;
+    listDirty = false;
+    render();
+  }
+  trendReset.addEventListener("click", resetView);
+  chartCard.addEventListener("dblclick", resetView);
+
+  function pinchState() {
+    const [p, q] = [...activePtrs.values()];
+    return { dist: Math.max(20, Math.hypot(p.x - q.x, p.y - q.y)), cx: (p.x + q.x) / 2 };
+  }
+
+  chartCard.addEventListener("pointerdown", (e) => {
+    if (!chartGeom) return;
+    chartCard.setPointerCapture(e.pointerId);
+    activePtrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (activePtrs.size === 1) {
+      panMode = false;
+      panLastX = e.clientX;
+      tapStart = { x: e.clientX, y: e.clientY };
+    } else if (activePtrs.size === 2) {
+      pinchLast = pinchState();
+      tapStart = null;
+      panMode = false;
+    }
+  });
+
+  chartCard.addEventListener("pointermove", (e) => {
+    if (!activePtrs.has(e.pointerId)) return;
+    activePtrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (activePtrs.size === 2) {
+      const now = pinchState();
+      if (pinchLast) {
+        panByPx(now.cx - pinchLast.cx);
+        zoomAround(now.cx, now.dist / pinchLast.dist);
+      }
+      pinchLast = now;
+    } else if (activePtrs.size === 1) {
+      const dx = e.clientX - panLastX;
+      if (!panMode && tapStart && Math.abs(e.clientX - tapStart.x) > 6) panMode = true;
+      if (panMode) {
+        panByPx(dx);
+        panLastX = e.clientX;
+      }
+    }
+  });
+
+  function endPointer(e, maybeTap) {
+    if (!activePtrs.has(e.pointerId)) return;
+    activePtrs.delete(e.pointerId);
+    if (activePtrs.size === 1) {
+      pinchLast = null;
+      const [p] = activePtrs.values();
+      panLastX = p.x;
+      panMode = true;
+      tapStart = null;
+    } else if (activePtrs.size === 0) {
+      if (maybeTap && !panMode && tapStart && chartApi) chartApi.tapAt(tapStart.x);
+      panMode = false;
+      tapStart = null;
+      pinchLast = null;
+      flushList();
+    }
+  }
+  chartCard.addEventListener("pointerup", (e) => endPointer(e, true));
+  chartCard.addEventListener("pointercancel", (e) => endPointer(e, false));
+
+  chartCard.addEventListener("wheel", (e) => {
+    if (!chartGeom || !e.ctrlKey) return; // plain scroll keeps scrolling the page
+    e.preventDefault();
+    zoomAround(e.clientX, Math.exp(-e.deltaY * 0.005));
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(flushList, 200);
+  }, { passive: false });
 
   // ---- Render ----
   function render() {
@@ -1355,7 +1552,7 @@
     const has = entries.length > 0;
     historyEl.hidden = !has;
     emptyEl.hidden = has;
-    renderRangeRow();
+    renderTrendHead();
     renderList();
     renderChart();
     renderHeader();
